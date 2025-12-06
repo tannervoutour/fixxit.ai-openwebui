@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Frontend Development Server (Svelte with Hot Reload)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend-dev
+    container_name: fixxit-frontend-dev
+    ports:
+      - "5173:5173"  # Vite dev server
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src
+      - ./static:/app/static
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./svelte.config.js:/app/svelte.config.js
+      - ./tailwind.config.js:/app/tailwind.config.js
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./postcss.config.js:/app/postcss.config.js
+      # Exclude node_modules to use container's version
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:8080
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - backend
+    networks:
+      - fixxit-dev
+
+  # Backend Development Server (Python with Auto-reload)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend-dev
+    container_name: fixxit-backend-dev
+    ports:
+      - "8080:8080"  # Backend API
+    volumes:
+      # Mount backend source code
+      - ./backend:/app/backend
+      - ./pyproject.toml:/app/pyproject.toml
+      # Persistent data directory
+      - fixxit_dev_data:/app/backend/data
+    environment:
+      # Basic configuration
+      - WEBUI_NAME=Fixxit.ai Development
+      - WEBUI_URL=http://localhost:3000
+      - WEBUI_SECRET_KEY=dev-secret-key-change-in-production
+      
+      # Development settings
+      - ENV=dev
+      - DEBUG=true
+      - WEBUI_BUILD_HASH=fixxit-dev
+      
+      # Database
+      - DATABASE_URL=sqlite:///app/backend/data/webui.db
+      
+      # Disable external services for development
+      - ENABLE_RAG=false
+      - ENABLE_WEB_SEARCH=false
+      
+      # UI Customization
+      - DEFAULT_THEME=dark
+      - SHOW_ADMIN_DETAILS=false
+      
+    working_dir: /app
+    command: >
+      bash -c "
+        cd backend && 
+        python -m uvicorn open_webui.main:app 
+          --host 0.0.0.0 
+          --port 8080 
+          --reload 
+          --reload-dir=/app/backend
+      "
+    networks:
+      - fixxit-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  fixxit_dev_data:
+    driver: local
+
+networks:
+  fixxit-dev:
+    driver: bridge
