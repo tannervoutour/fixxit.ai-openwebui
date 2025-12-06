@@ -654,6 +654,27 @@
 					</Tooltip>
 				</div>
 
+				<!-- Logs Button (Collapsed Sidebar) -->
+				<div>
+					<Tooltip content={$i18n.t('Logs')} placement="right">
+						<button
+							class=" cursor-pointer flex rounded-xl hover:bg-gray-100 dark:hover:bg-gray-850 transition group"
+							on:click={(e) => {
+								e.stopImmediatePropagation();
+								e.preventDefault();
+
+								showLogs.set(true);
+							}}
+							draggable="false"
+							aria-label={$i18n.t('Logs')}
+						>
+							<div class=" self-center flex items-center justify-center size-9">
+								<Logs className="size-4.5" />
+							</div>
+						</button>
+					</Tooltip>
+				</div>
+
 				{#if ($config?.features?.enable_notes ?? false) && ($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))}
 					<div class="">
 						<Tooltip content={$i18n.t('Notes')} placement="right">
