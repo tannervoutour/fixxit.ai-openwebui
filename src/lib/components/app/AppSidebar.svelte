@@ -1,7 +1,10 @@
 <script lang="ts">
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Plus from '$lib/components/icons/Plus.svelte';
+	import Logs from '$lib/components/icons/Logs.svelte';
+	import Search from '$lib/components/icons/Search.svelte';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { showLogs, showSearch } from '$lib/stores';
 
 	let selected = '';
 </script>
@@ -58,9 +61,27 @@
 		</button>
 	</div>
 
-	<!-- <div class="flex justify-center relative group text-gray-400">
-		<button class=" cursor-pointer p-2" on:click={() => {}}>
-			<Plus className="size-4" strokeWidth="2" />
-		</button>
-	</div> -->
+	<!-- Search Button -->
+	<div class="flex justify-center relative group text-gray-400">
+		<Tooltip content="Search" placement="right">
+			<button
+				class="cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+				on:click={() => showSearch.set(true)}
+			>
+				<Search className="size-5" strokeWidth="2" />
+			</button>
+		</Tooltip>
+	</div>
+
+	<!-- Logs Button -->
+	<div class="flex justify-center relative group text-gray-400">
+		<Tooltip content="Logs" placement="right">
+			<button
+				class="cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+				on:click={() => showLogs.set(true)}
+			>
+				<Logs className="size-5" strokeWidth="2" />
+			</button>
+		</Tooltip>
+	</div>
 </div>
