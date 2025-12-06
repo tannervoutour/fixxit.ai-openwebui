@@ -13,6 +13,7 @@
 		folders as _folders,
 		showSidebar,
 		showSearch,
+		showLogs,
 		mobile,
 		showArchivedChats,
 		pinnedChats,
@@ -56,7 +57,9 @@
 	import ChannelItem from './Sidebar/ChannelItem.svelte';
 	import PencilSquare from '../icons/PencilSquare.svelte';
 	import Search from '../icons/Search.svelte';
+	import Logs from '../icons/Logs.svelte';
 	import SearchModal from './SearchModal.svelte';
+	import LogsModal from './LogsModal.svelte';
 	import FolderModal from './Sidebar/Folders/FolderModal.svelte';
 	import Sidebar from '../icons/Sidebar.svelte';
 	import PinnedModelList from './Sidebar/PinnedModelList.svelte';
@@ -555,6 +558,15 @@
 	}}
 />
 
+<LogsModal
+	bind:show={$showLogs}
+	onClose={() => {
+		if ($mobile) {
+			showSidebar.set(false);
+		}
+	}}
+/>
+
 <button
 	id="sidebar-new-chat-button"
 	class="hidden"
@@ -874,6 +886,27 @@
 								<div class=" self-center text-sm font-primary">{$i18n.t('Search')}</div>
 							</div>
 							<HotkeyHint name="search" className=" group-hover:visible invisible" />
+						</button>
+					</div>
+
+					<!-- Logs Button -->
+					<div class="px-[0.4375rem] flex justify-center text-gray-800 dark:text-gray-200">
+						<button
+							id="sidebar-logs-button"
+							class="group grow flex items-center space-x-3 rounded-2xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition outline-none"
+							on:click={() => {
+								showLogs.set(true);
+							}}
+							draggable="false"
+							aria-label={$i18n.t('Logs')}
+						>
+							<div class="self-center">
+								<Logs strokeWidth="2" className="size-4.5" />
+							</div>
+
+							<div class="flex flex-1 self-center translate-y-[0.5px]">
+								<div class=" self-center text-sm font-primary">{$i18n.t('Logs')}</div>
+							</div>
 						</button>
 					</div>
 
