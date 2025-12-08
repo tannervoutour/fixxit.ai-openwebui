@@ -8,6 +8,7 @@
 	import General from './General.svelte';
 	import Permissions from './Permissions.svelte';
 	import Users from './Users.svelte';
+	import Database from './Database.svelte';
 	import UserPlusSolid from '$lib/components/icons/UserPlusSolid.svelte';
 	import WrenchSolid from '$lib/components/icons/WrenchSolid.svelte';
 	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
@@ -24,13 +25,14 @@
 
 	export let custom = true;
 
-	export let tabs = ['general', 'permissions', 'users'];
+	export let tabs = ['general', 'permissions', 'users', 'database'];
 
 	let selectedTab = 'general';
 	let loading = false;
 	let showDeleteConfirmDialog = false;
 
 	let userCount = 0;
+	let databaseComponent = null;
 
 	export let name = '';
 	export let description = '';
@@ -96,6 +98,15 @@
 
 	const submitHandler = async () => {
 		loading = true;
+
+		// If database tab is selected and component exists, save database config first
+		if (selectedTab === 'database' && databaseComponent) {
+			const databaseSaveSuccess = await databaseComponent.save();
+			if (!databaseSaveSuccess) {
+				loading = false;
+				return; // Don't proceed if database save failed
+			}
+		}
 
 		const group = {
 			name,
@@ -241,6 +252,33 @@
 									<div class=" self-center">{$i18n.t('Users')}</div>
 								</button>
 							{/if}
+
+							{#if tabs.includes('database') && custom}
+								<button
+									class="px-0.5 py-1 max-w-fit w-fit rounded-lg flex-1 lg:flex-none flex text-right transition {selectedTab ===
+									'database'
+										? ''
+										: ' text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'}"
+									on:click={() => {
+										selectedTab = 'database';
+									}}
+									type="button"
+								>
+									<div class=" self-center mr-2">
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											viewBox="0 0 16 16"
+											fill="currentColor"
+											class="w-4 h-4"
+										>
+											<path
+												d="M8 1a4.5 4.5 0 0 0-4.5 4.5c0 .3.024.598.07.889C2.253 7.234 1 8.66 1 10.5A4.5 4.5 0 0 0 5.5 15h5a4.5 4.5 0 0 0 4.5-4.5c0-1.84-1.253-3.266-2.57-4.111A4.485 4.485 0 0 0 12.5 5.5 4.5 4.5 0 0 0 8 1Z"
+											/>
+										</svg>
+									</div>
+									<div class=" self-center">{$i18n.t('Database')}</div>
+								</button>
+							{/if}
 						</div>
 
 						<div class="flex-1 mt-1 lg:mt-1 lg:h-[30rem] lg:max-h-[30rem] flex flex-col">
@@ -259,10 +297,16 @@
 									<Permissions bind:permissions {defaultPermissions} />
 								{:else if selectedTab == 'users'}
 									<Users bind:userCount groupId={group?.id} />
+								{:else if selectedTab == 'database'}
+									<Database
+										bind:this={databaseComponent}
+										groupId={group?.id}
+										{edit}
+									/>
 								{/if}
 							</div>
 
-							{#if ['general', 'permissions'].includes(selectedTab)}
+							{#if ['general', 'permissions', 'database'].includes(selectedTab)}
 								<div class="flex justify-end pt-3 text-sm font-medium gap-1.5">
 									<button
 										class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full flex flex-row space-x-1 items-center {loading
