@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from typing import Optional
 import logging
@@ -17,7 +18,9 @@ from open_webui.constants import ERROR_MESSAGES
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.postgres_connection import postgres_manager, test_database_connection
 from open_webui.env import SRC_LOG_LEVELS
+from pydantic import BaseModel
 
 
 log = logging.getLogger(__name__)
@@ -242,4 +245,187 @@ async def delete_group_by_id(id: str, user=Depends(get_admin_user)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.DEFAULT(e),
+        )
+
+
+############################
+# Database Configuration
+############################
+
+class DatabaseConfigForm(BaseModel):
+    connection_string: str
+    password: str
+    enabled: bool = True
+
+class DatabaseConfigResponse(BaseModel):
+    enabled: bool
+    connection: dict
+    test_status: Optional[str] = None
+
+@router.post("/id/{id}/database/configure", response_model=Optional[GroupResponse])
+async def configure_group_database(
+    id: str, 
+    config_form: DatabaseConfigForm, 
+    user=Depends(get_admin_user)
+):
+    """Configure database connection for a group (admin only)"""
+    try:
+        # Get existing group
+        group = Groups.get_group_by_id(id)
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ERROR_MESSAGES.DEFAULT("Group not found"),
+            )
+        
+        # Parse and validate connection string
+        try:
+            connection_config = postgres_manager.create_connection_config(
+                config_form.connection_string, 
+                config_form.password
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ERROR_MESSAGES.DEFAULT(f"Invalid connection string: {str(e)}"),
+            )
+        
+        # Test connection if enabled
+        if config_form.enabled:
+            connection_test = await postgres_manager.test_connection(connection_config)
+            if not connection_test:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=ERROR_MESSAGES.DEFAULT("Database connection test failed"),
+                )
+        
+        # Update group data with database configuration
+        group_data = group.data or {}
+        group_data["database"] = {
+            "enabled": config_form.enabled,
+            "connection": connection_config,
+            "configured_at": int(time.time()),
+            "configured_by": user.id
+        }
+        
+        # Update group
+        updated_group = Groups.update_group_by_id(
+            id, 
+            GroupUpdateForm(data=group_data)
+        )
+        
+        if updated_group:
+            log.info(f"Database configured for group {id} by user {user.id}")
+            return GroupResponse(
+                **updated_group.model_dump(),
+                member_count=Groups.get_group_member_count_by_id(updated_group.id),
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ERROR_MESSAGES.DEFAULT("Error updating group database configuration"),
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception(f"Error configuring database for group {id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ERROR_MESSAGES.DEFAULT(f"Internal server error: {str(e)}"),
+        )
+
+
+@router.get("/id/{id}/database", response_model=Optional[DatabaseConfigResponse])
+async def get_group_database_config(id: str, user=Depends(get_admin_user)):
+    """Get database configuration for a group (admin only)"""
+    try:
+        group = Groups.get_group_by_id(id)
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ERROR_MESSAGES.DEFAULT("Group not found"),
+            )
+        
+        if not group.data or "database" not in group.data:
+            return DatabaseConfigResponse(
+                enabled=False,
+                connection={}
+            )
+        
+        db_config = group.data["database"]
+        
+        # Return config without sensitive password
+        safe_connection = db_config["connection"].copy()
+        if "password" in safe_connection:
+            safe_connection["password"] = "***encrypted***"
+        
+        return DatabaseConfigResponse(
+            enabled=db_config.get("enabled", False),
+            connection=safe_connection
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception(f"Error getting database config for group {id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ERROR_MESSAGES.DEFAULT(f"Internal server error: {str(e)}"),
+        )
+
+
+@router.post("/database/test", response_model=dict)
+async def test_database_connection_endpoint(
+    config_form: DatabaseConfigForm, 
+    user=Depends(get_admin_user)
+):
+    """Test database connection without saving configuration"""
+    try:
+        # Test the connection
+        success = await test_database_connection(
+            config_form.connection_string, 
+            config_form.password
+        )
+        
+        return {
+            "success": success,
+            "message": "Connection successful" if success else "Connection failed"
+        }
+        
+    except Exception as e:
+        log.exception(f"Error testing database connection: {e}")
+        return {
+            "success": False,
+            "message": f"Connection test failed: {str(e)}"
+        }
+
+
+@router.get("/accessible-with-logs", response_model=list[dict])
+async def get_accessible_groups_with_logs(user=Depends(get_verified_user)):
+    """Get groups accessible to user that have database configuration enabled"""
+    try:
+        # Get user's groups
+        filter_params = {"member_id": user.id} if user.role != "admin" else {}
+        groups = Groups.get_groups(filter=filter_params)
+        
+        accessible_groups = []
+        for group in groups:
+            if (group.data and 
+                "database" in group.data and 
+                group.data["database"].get("enabled", False)):
+                
+                accessible_groups.append({
+                    "id": group.id,
+                    "name": group.name,
+                    "description": group.description
+                })
+        
+        return accessible_groups
+        
+    except Exception as e:
+        log.exception(f"Error getting accessible groups with logs for user {user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ERROR_MESSAGES.DEFAULT(f"Internal server error: {str(e)}"),
         )
