@@ -100,7 +100,7 @@
 	<EditGroupModal
 		bind:show={showAddGroupModal}
 		edit={false}
-		tabs={['general', 'permissions']}
+		tabs={['general', 'permissions', 'database']}
 		permissions={defaultPermissions}
 		onSubmit={addGroupHandler}
 	/>
