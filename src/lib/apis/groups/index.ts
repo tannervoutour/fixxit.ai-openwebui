@@ -239,33 +239,49 @@ export const removeUserFromGroup = async (token: string, id: string, userIds: st
 export const configureGroupDatabase = async (token: string, groupId: string, config: object) => {
 	let error = null;
 
-	const res = await fetch(`${WEBUI_API_BASE_URL}/groups/id/${groupId}/database/configure`, {
-		method: 'POST',
-		headers: {
-			Accept: 'application/json',
-			'Content-Type': 'application/json',
-			authorization: `Bearer ${token}`
-		},
-		body: JSON.stringify(config)
-	})
-		.then(async (res) => {
-			if (!res.ok) throw await res.json();
-			return res.json();
-		})
-		.then((json) => {
-			return json;
-		})
-		.catch((err) => {
-			error = err.detail;
-			console.error(err);
-			return null;
-		});
+	// Create an AbortController for timeout
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-	if (error) {
-		throw error;
+	try {
+		const res = await fetch(`${WEBUI_API_BASE_URL}/groups/id/${groupId}/database/configure`, {
+			method: 'POST',
+			headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+				authorization: `Bearer ${token}`
+			},
+			body: JSON.stringify(config),
+			signal: controller.signal
+		})
+			.then(async (res) => {
+				if (!res.ok) throw await res.json();
+				return res.json();
+			})
+			.then((json) => {
+				clearTimeout(timeoutId);
+				return json;
+			})
+			.catch((err) => {
+				clearTimeout(timeoutId);
+				if (err.name === 'AbortError') {
+					error = 'Request timeout - database connection test may be taking too long';
+				} else {
+					error = err.detail || err.message;
+				}
+				console.error(err);
+				return null;
+			});
+
+		if (error) {
+			throw error;
+		}
+
+		return res;
+	} catch (err) {
+		clearTimeout(timeoutId);
+		throw err;
 	}
-
-	return res;
 };
 
 export const getGroupDatabaseConfig = async (token: string, groupId: string) => {

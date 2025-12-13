@@ -6,8 +6,9 @@ Handles CRUD operations for external logs storage with group-based access contro
 import logging
 import time
 import uuid
+import json
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
@@ -72,6 +73,7 @@ class LogsListResponse(BaseModel):
     total: int
     has_more: bool
     categories: List[str] = []  # Available categories for filtering
+    debug_info: Optional[List[str]] = []  # Debug information for troubleshooting
 
 class EquipmentGroupResponse(BaseModel):
     """Response model for equipment groups"""
@@ -98,23 +100,45 @@ async def get_group_database_connection(group_id: str):
 
 def format_log_entry(log_data: dict, group_name: str, group_id: str) -> LogResponse:
     """Format database log entry into response model"""
+    
+    def safe_datetime_to_string(dt_value):
+        """Convert datetime object to string safely"""
+        if dt_value is None:
+            return ""
+        if isinstance(dt_value, datetime):
+            return dt_value.isoformat()
+        return str(dt_value)
+    
+    def safe_json_parse(json_str):
+        """Parse JSON string to list/dict safely"""
+        if json_str is None:
+            return None
+        if isinstance(json_str, (list, dict)):
+            return json_str
+        if isinstance(json_str, str):
+            try:
+                return json.loads(json_str)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        return None
+    
     return LogResponse(
         id=log_data.get("id"),
         insight_title=log_data.get("insight_title", ""),
         insight_content=log_data.get("insight_content", ""),
         user_name=log_data.get("user_name", ""),
-        created_at=log_data.get("created_at", ""),
-        updated_at=log_data.get("updated_at", ""),
+        created_at=safe_datetime_to_string(log_data.get("created_at")),
+        updated_at=safe_datetime_to_string(log_data.get("updated_at")),
         source=log_data.get("source", ""),
         log_type=log_data.get("log_type", ""),
         activation_status=log_data.get("activation_status", ""),
         verified=log_data.get("verified", False),
         problem_category=log_data.get("problem_category"),
         root_cause=log_data.get("root_cause"),
-        solution_steps=log_data.get("solution_steps"),
-        tools_required=log_data.get("tools_required"),
-        tags=log_data.get("tags"),
-        equipment_group=log_data.get("equipment_involved"),  # Note: column name mismatch
+        solution_steps=safe_json_parse(log_data.get("solution_steps")),
+        tools_required=safe_json_parse(log_data.get("tools_required")),
+        tags=safe_json_parse(log_data.get("tags")),
+        equipment_group=safe_json_parse(log_data.get("equipment_group")),
         notes=log_data.get("notes"),
         business_impact=log_data.get("business_impact"),
         reusability_score=log_data.get("reusability_score"),
@@ -156,7 +180,7 @@ def create_log_entry_data(request: LogCreationRequest, user: UserModel) -> dict:
         "solution_steps": request.solution_steps,       # Column 19
         "tools_required": request.tools_required,       # Column 20
         "tags": request.tags,                           # Column 24
-        "equipment_involved": request.equipment_group,   # Column 25 (note: column name)
+        "equipment_group": request.equipment_group,      # Column 25
         "notes": request.notes,                         # Column 8
     }
 
@@ -171,25 +195,43 @@ async def get_logs(
     business_impact: Optional[str] = Query(None, description="Filter by business impact"),
     verified: Optional[bool] = Query(None, description="Filter by verification status"),
     equipment: Optional[str] = Query(None, description="Filter by equipment"),
+    user_filter: Optional[str] = Query(None, description="Filter by user name"),
+    title_search: Optional[str] = Query(None, description="Search in log titles"),
+    date_after: Optional[str] = Query(None, description="Filter logs after this date"),
+    date_before: Optional[str] = Query(None, description="Filter logs before this date"),
     limit: int = Query(50, ge=1, le=200, description="Number of logs to return"),
     offset: int = Query(0, ge=0, description="Number of logs to skip"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort in descending order")
 ):
     """Get logs accessible to user based on group membership with filtering and sorting"""
+    
+    # Add debug info to response headers for frontend visibility
+    debug_info = []
+    
     try:
         # Get user's groups with database configuration
         filter_params = {"member_id": user.id} if user.role != "admin" else {}
         user_groups = Groups.get_groups(filter=filter_params)
+        
+        debug_info.append(f"User {user.id} has {len(user_groups)} groups")
+        logger.info(f"get_logs: User {user.id} has {len(user_groups)} groups")
         
         all_logs = []
         all_categories = set()
         
         # Fetch logs from each group's database
         for group in user_groups:
+            debug_info.append(f"Processing group {group.id} ({group.name})")
+            logger.info(f"get_logs: Processing group {group.id} ({group.name})")
             db_config = await get_group_database_connection(group.id)
             if not db_config:
+                debug_info.append(f"Group {group.id} has no database configuration")
+                logger.info(f"get_logs: Group {group.id} has no database configuration")
                 continue
+            
+            debug_info.append(f"Group {group.id} has database configuration, querying logs")
+            logger.info(f"get_logs: Group {group.id} has database configuration, querying logs")
             
             try:
                 async with postgres_manager.get_connection(group.id, db_config) as conn:
@@ -211,8 +253,28 @@ async def get_logs(
                         query_params.append(verified)
                     
                     if equipment:
-                        query += " AND equipment_involved @> $" + str(len(query_params) + 1)
+                        query += " AND equipment_group @> $" + str(len(query_params) + 1)
                         query_params.append(f'["{equipment}"]')
+                    
+                    if user_filter:
+                        query += " AND LOWER(user_name) LIKE LOWER($" + str(len(query_params) + 1) + ")"
+                        query_params.append(f"%{user_filter}%")
+                    
+                    if title_search:
+                        query += " AND LOWER(insight_title) LIKE LOWER($" + str(len(query_params) + 1) + ")"
+                        query_params.append(f"%{title_search}%")
+                    
+                    if date_after:
+                        # Convert string date to Python date object for asyncpg
+                        date_after_obj = datetime.strptime(date_after, "%Y-%m-%d").date()
+                        query += " AND created_at::date >= $" + str(len(query_params) + 1)
+                        query_params.append(date_after_obj)
+                    
+                    if date_before:
+                        # Convert string date to Python date object for asyncpg
+                        date_before_obj = datetime.strptime(date_before, "%Y-%m-%d").date()
+                        query += " AND created_at::date <= $" + str(len(query_params) + 1)
+                        query_params.append(date_before_obj)
                     
                     # Add sorting
                     valid_sort_fields = ["created_at", "updated_at", "insight_title", "problem_category", "user_name"]
@@ -223,6 +285,7 @@ async def get_logs(
                     if sort_desc:
                         query += " DESC"
                     
+                    
                     # Add pagination
                     query += " LIMIT $" + str(len(query_params) + 1)
                     query_params.append(limit)
@@ -232,7 +295,10 @@ async def get_logs(
                         query_params.append(offset)
                     
                     # Execute query
+                    logger.info(f"get_logs: Executing query: {query} with params: {query_params}")
                     rows = await conn.fetch(query, *query_params)
+                    debug_info.append(f"Query returned {len(rows)} logs from group {group.id}")
+                    logger.info(f"get_logs: Query returned {len(rows)} logs from group {group.id}")
                     
                     # Format results
                     for row in rows:
@@ -262,7 +328,8 @@ async def get_logs(
             logs=all_logs,
             total=total_logs,
             has_more=total_logs > limit,
-            categories=sorted(list(all_categories))
+            categories=sorted(list(all_categories)),
+            debug_info=debug_info
         )
         
     except Exception as e:

@@ -57,6 +57,7 @@
 <EditGroupModal
 	bind:show={showEdit}
 	edit
+	tabs={['general', 'permissions', 'users', 'database']}
 	{group}
 	{defaultPermissions}
 	onSubmit={updateHandler}

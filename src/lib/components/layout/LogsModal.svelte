@@ -29,11 +29,36 @@
 	let equipmentFilter = '';
 	let sortBy = 'created_at';
 	let sortDesc = true;
+	
+	// Advanced filter options
+	let dateRangeBefore = '';
+	let dateRangeAfter = '';
+	let selectedUser = '';
+	let titleSearch = '';
+	let availableUsers = [];
+	
+	// Problem category management
+	let showNewCategoryInput = false;
+	let newCategoryValue = '';
+	
+	// Track previous filter values to detect changes including resets to default
+	let prevSelectedCategory = '';
+	let prevVerifiedFilter = '';
+	let prevEquipmentFilter = '';
+	let prevSortBy = 'created_at';
+	let prevSortDesc = true;
+	let prevDateRangeAfter = '';
+	let prevDateRangeBefore = '';
+	let prevSelectedUser = '';
+	let prevTitleSearch = '';
 
 	// Available groups and equipment
 	let availableGroups = [];
 	let availableEquipment = [];
 	let problemCategories = [];
+	
+	// Debug availableGroups reactively
+	$: console.log('LogsModal - availableGroups reactive update:', availableGroups, 'length:', availableGroups.length);
 
 	// Log creation form
 	let selectedGroupId = '';
@@ -67,6 +92,8 @@
 
 	const resetForm = () => {
 		selectedGroupId = '';
+		showNewCategoryInput = false;
+		newCategoryValue = '';
 		formData = {
 			insight_title: '',
 			insight_content: '',
@@ -80,17 +107,42 @@
 		};
 	};
 
+	const handleCategoryChange = (value) => {
+		if (value === '_new_category') {
+			showNewCategoryInput = true;
+			formData.problem_category = '';
+		} else {
+			showNewCategoryInput = false;
+			formData.problem_category = value;
+		}
+	};
+
+	const handleNewCategorySubmit = () => {
+		if (newCategoryValue.trim()) {
+			formData.problem_category = newCategoryValue.trim();
+			showNewCategoryInput = false;
+			newCategoryValue = '';
+		}
+	};
+
 	const loadInitialData = async () => {
+		console.log('LogsModal - loadInitialData called');
 		try {
 			loading = true;
 			
 			// Load groups with database configured
+			console.log('LogsModal - calling getGroupsWithLogs API');
 			const groupsResponse = await getGroupsWithLogs(localStorage.token);
+			console.log('LogsModal - getGroupsWithLogs response:', groupsResponse);
 			if (groupsResponse) {
 				availableGroups = groupsResponse;
+				console.log('LogsModal - availableGroups set to:', availableGroups);
 				if (availableGroups.length > 0) {
 					selectedGroupId = availableGroups[0].id;
+					console.log('LogsModal - selectedGroupId set to:', selectedGroupId);
 				}
+			} else {
+				console.log('LogsModal - no groups response received');
 			}
 
 			// Load problem categories
@@ -117,6 +169,7 @@
 	};
 
 	const loadLogs = async () => {
+		console.log('LogsModal - loadLogs called');
 		try {
 			loading = true;
 			
@@ -127,18 +180,42 @@
 				sort_desc: sortDesc
 			};
 
+			// Basic filters
 			if (selectedCategory) params.category = selectedCategory;
 			if (selectedBusinessImpact) params.business_impact = selectedBusinessImpact;
 			if (verifiedFilter !== '') params.verified = verifiedFilter === 'true';
 			if (equipmentFilter) params.equipment = equipmentFilter;
+			
+			// Advanced filters based on sort type
+			if (dateRangeAfter) params.date_after = dateRangeAfter;
+			if (dateRangeBefore) params.date_before = dateRangeBefore;
+			if (selectedUser) params.user_filter = selectedUser;
+			if (titleSearch) params.title_search = titleSearch;
+			
+			console.log('LogsModal - calling getLogs API with params:', params);
 
+			console.log('LogsModal - about to call getLogs API');
 			const response = await getLogs(localStorage.token, params);
+			console.log('LogsModal - getLogs API response:', response);
 			
 			if (response) {
+				console.log('LogsModal - processing response, logs:', response.logs?.length || 0);
+				
+				// Display debug information if available
+				if (response.debug_info && response.debug_info.length > 0) {
+					console.log('🔍 Backend Debug Info:');
+					response.debug_info.forEach((info, index) => {
+						console.log(`  ${index + 1}. ${info}`);
+					});
+				}
+				
 				logs = response.logs;
 				totalLogs = response.total;
 				hasMore = response.has_more;
 				categories = response.categories;
+				console.log('LogsModal - logs array updated, length:', logs.length);
+			} else {
+				console.log('LogsModal - no response received from getLogs');
 			}
 			
 		} catch (error) {
@@ -195,17 +272,37 @@
 
 	// Load data when modal opens
 	$: if (show) {
+		console.log('LogsModal - show changed to true, calling loadInitialData');
 		loadInitialData();
 	}
 
-	// Reload logs when filters change
-	$: if (show && (selectedCategory || selectedBusinessImpact || verifiedFilter || equipmentFilter || sortBy !== 'created_at' || !sortDesc)) {
+	// Reload logs when any filter changes (including resets to default)
+	$: if (show && (
+		selectedCategory !== prevSelectedCategory ||
+		verifiedFilter !== prevVerifiedFilter ||
+		equipmentFilter !== prevEquipmentFilter ||
+		sortBy !== prevSortBy ||
+		sortDesc !== prevSortDesc ||
+		dateRangeAfter !== prevDateRangeAfter ||
+		dateRangeBefore !== prevDateRangeBefore ||
+		selectedUser !== prevSelectedUser ||
+		titleSearch !== prevTitleSearch
+	)) {
+		prevSelectedCategory = selectedCategory;
+		prevVerifiedFilter = verifiedFilter;
+		prevEquipmentFilter = equipmentFilter;
+		prevSortBy = sortBy;
+		prevSortDesc = sortDesc;
+		prevDateRangeAfter = dateRangeAfter;
+		prevDateRangeBefore = dateRangeBefore;
+		prevSelectedUser = selectedUser;
+		prevTitleSearch = titleSearch;
 		loadLogs();
 	}
 </script>
 
 <Modal size="xl" bind:show>
-	<div class="py-3 dark:text-gray-300 text-gray-700">
+	<div class="py-3 px-6 dark:text-gray-300 text-gray-700">
 		<div class="mb-4 flex items-center justify-between">
 			<div class="flex items-center space-x-3">
 				<Logs className="size-5" strokeWidth="2" />
@@ -238,52 +335,113 @@
 
 		{#if selectedTab === 'view'}
 			<!-- View Logs Tab -->
-			<div class="space-y-4">
+			<div class="space-y-4 px-6 pb-6">
 				<!-- Filters -->
-				<div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-					<div>
-						<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-							{$i18n.t('Category')}
-						</label>
-						<select 
-							bind:value={selectedCategory}
-							class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
-						>
-							<option value="">{$i18n.t('All Categories')}</option>
-							{#each categories as category}
-								<option value={category}>{category}</option>
-							{/each}
-						</select>
-					</div>
-					
-					<div>
-						<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-							{$i18n.t('Verified')}
-						</label>
-						<select 
-							bind:value={verifiedFilter}
-							class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
-						>
-							<option value="">{$i18n.t('All')}</option>
-							<option value="true">{$i18n.t('Verified')}</option>
-							<option value="false">{$i18n.t('Unverified')}</option>
-						</select>
+				<div class="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+					<!-- Primary Filters Row -->
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div>
+							<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+								{$i18n.t('Category')}
+							</label>
+							<select 
+								bind:value={selectedCategory}
+								class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+							>
+								<option value="">{$i18n.t('All Categories')}</option>
+								{#each categories as category}
+									<option value={category}>{category}</option>
+								{/each}
+							</select>
+						</div>
+						
+						<div>
+							<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+								{$i18n.t('Verified')}
+							</label>
+							<select 
+								bind:value={verifiedFilter}
+								class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+							>
+								<option value="">{$i18n.t('All')}</option>
+								<option value="true">{$i18n.t('Verified')}</option>
+								<option value="false">{$i18n.t('Unverified')}</option>
+							</select>
+						</div>
+
+						<div>
+							<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+								{$i18n.t('Sort By')}
+							</label>
+							<select 
+								bind:value={sortBy}
+								class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+							>
+								<option value="created_at">{$i18n.t('Date Created')}</option>
+								<option value="updated_at">{$i18n.t('Date Updated')}</option>
+								<option value="insight_title">{$i18n.t('Title')}</option>
+								<option value="user_name">{$i18n.t('User')}</option>
+							</select>
+						</div>
 					</div>
 
-					<div>
-						<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-							{$i18n.t('Sort By')}
-						</label>
-						<select 
-							bind:value={sortBy}
-							class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
-						>
-							<option value="created_at">{$i18n.t('Date Created')}</option>
-							<option value="updated_at">{$i18n.t('Date Updated')}</option>
-							<option value="insight_title">{$i18n.t('Title')}</option>
-							<option value="user_name">{$i18n.t('User')}</option>
-						</select>
-					</div>
+					<!-- Advanced Filters Row (Conditional) -->
+					{#if sortBy === 'created_at' || sortBy === 'updated_at'}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+							<div>
+								<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+									{$i18n.t('After Date')}
+								</label>
+								<input
+									type="date"
+									bind:value={dateRangeAfter}
+									class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+								/>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+									{$i18n.t('Before Date')}
+								</label>
+								<input
+									type="date"
+									bind:value={dateRangeBefore}
+									class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+								/>
+							</div>
+						</div>
+					{/if}
+
+					{#if sortBy === 'user_name'}
+						<div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+							<div class="max-w-md">
+								<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+									{$i18n.t('Select User')}
+								</label>
+								<input
+									type="text"
+									bind:value={selectedUser}
+									placeholder={$i18n.t('Enter username to filter')}
+									class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+								/>
+							</div>
+						</div>
+					{/if}
+
+					{#if sortBy === 'insight_title'}
+						<div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+							<div class="max-w-md">
+								<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+									{$i18n.t('Search Title')}
+								</label>
+								<input
+									type="text"
+									bind:value={titleSearch}
+									placeholder={$i18n.t('Enter title keywords')}
+									class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+								/>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Logs List -->
@@ -353,7 +511,7 @@
 
 		{:else}
 			<!-- Create Log Tab -->
-			<div class="space-y-4">
+			<div class="space-y-4 px-6 pb-6">
 				{#if availableGroups.length === 0}
 					<div class="text-center py-8 text-gray-500 dark:text-gray-400">
 						<p class="text-lg font-medium mb-2">{$i18n.t('No Database Groups Available')}</p>
@@ -411,15 +569,58 @@
 						<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							{$i18n.t('Problem Category')}
 						</label>
-						<select 
-							bind:value={formData.problem_category}
-							class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-						>
-							<option value="">{$i18n.t('Select category')}</option>
-							{#each problemCategories as category}
-								<option value={category}>{category}</option>
-							{/each}
-						</select>
+						
+						{#if showNewCategoryInput}
+							<!-- New Category Input -->
+							<div class="space-y-2">
+								<div class="flex items-center space-x-2">
+									<input
+										type="text"
+										bind:value={newCategoryValue}
+										placeholder={$i18n.t('Enter new category name')}
+										class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+										on:keydown={(e) => e.key === 'Enter' && handleNewCategorySubmit()}
+									/>
+									<button
+										type="button"
+										on:click={handleNewCategorySubmit}
+										class="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+									>
+										{$i18n.t('Add')}
+									</button>
+									<button
+										type="button"
+										on:click={() => { showNewCategoryInput = false; newCategoryValue = ''; }}
+										class="px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+									>
+										{$i18n.t('Cancel')}
+									</button>
+								</div>
+							</div>
+						{:else}
+							<!-- Category Dropdown -->
+							<div class="space-y-2">
+								<select 
+									value={formData.problem_category}
+									on:change={(e) => handleCategoryChange(e.target.value)}
+									class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+								>
+									<option value="">{$i18n.t('Select category')}</option>
+									{#each problemCategories as category}
+										<option value={category}>{category}</option>
+									{/each}
+									<option value="_new_category" class="italic text-blue-600 dark:text-blue-400">
+										+ {$i18n.t('Add new category')}
+									</option>
+								</select>
+								
+								{#if formData.problem_category}
+									<div class="text-xs text-gray-600 dark:text-gray-400">
+										{$i18n.t('Selected')}: <span class="font-medium">{formData.problem_category}</span>
+									</div>
+								{/if}
+							</div>
+						{/if}
 					</div>
 
 					<!-- Root Cause -->

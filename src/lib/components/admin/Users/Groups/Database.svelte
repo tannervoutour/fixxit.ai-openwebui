@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { getContext } from 'svelte';
+	import { getContext, onMount, onDestroy } from 'svelte';
 	const i18n = getContext('i18n');
+
+	onMount(() => {
+		console.log('Database.svelte - COMPONENT MOUNTED');
+	});
+
+	onDestroy(() => {
+		console.log('Database.svelte - COMPONENT DESTROYED');
+	});
 
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -13,32 +21,68 @@
 	let connectionString = '';
 	let password = '';
 	let enabled = false;
+	
+	// Real-time debugging
+	$: console.log('Database.svelte - enabled state:', enabled);
+	$: console.log('Database.svelte - groupId:', groupId);
+	$: {
+		console.log('Database.svelte - hasUserInteracted:', hasUserInteracted);
+		if (!hasUserInteracted) {
+			console.trace('Database.svelte - hasUserInteracted was reset to false');
+		}
+	}
+	$: console.log('Database.svelte - loadedGroupId:', loadedGroupId);
 	let loading = false;
 	let testing = false;
 	let testResult = null;
+	let hasUserInteracted = false;
+	let userInteractionGroupId = null;
 
 	const loadDatabaseConfig = async () => {
-		if (!groupId || !edit) return;
+		console.log('Database.svelte - loadDatabaseConfig called, groupId:', groupId, 'hasUserInteracted:', hasUserInteracted);
+		if (!groupId) return;
 		
 		try {
+			console.log('Database.svelte - calling getGroupDatabaseConfig API');
 			const config = await getGroupDatabaseConfig(localStorage.token, groupId);
+			console.log('Database.svelte - received config:', config);
+			
 			if (config && config.enabled !== undefined) {
-				enabled = config.enabled;
-				if (config.connection) {
-					// Reconstruct connection string from config
-					const conn = config.connection;
-					if (conn.host && conn.port && conn.database && conn.user) {
-						connectionString = `postgresql://${conn.user}@${conn.host}:${conn.port}/${conn.database}`;
+				console.log('Database.svelte - config has enabled field:', config.enabled);
+				// Only update state if user hasn't interacted with THIS group or if we're refreshing after save
+				const userHasInteractedWithThisGroup = hasUserInteracted && userInteractionGroupId === groupId;
+				if (!userHasInteractedWithThisGroup || loading) {
+					console.log('Database.svelte - updating enabled to:', config.enabled);
+					enabled = config.enabled;
+					if (config.connection) {
+						// Reconstruct psql connection string from config
+						const conn = config.connection;
+						if (conn.host && conn.port && conn.database && conn.user) {
+							connectionString = `psql -h ${conn.host} -p ${conn.port} -d ${conn.database} -U ${conn.user}`;
+							console.log('Database.svelte - reconstructed connection string');
+						}
 					}
+				} else {
+					console.log('Database.svelte - skipping config load due to user interaction');
 				}
+			} else {
+				console.log('Database.svelte - config is empty or missing enabled field');
 			}
 		} catch (error) {
-			console.error('Error loading database config:', error);
+			console.error('Database.svelte - Error loading database config:', error);
 		}
 	};
 
-	$: if (groupId && edit) {
+	let loadedGroupId = null;
+	
+	$: if (groupId && groupId !== loadedGroupId) {
+		// Reset interaction state when switching groups
+		if (groupId !== userInteractionGroupId) {
+			hasUserInteracted = false;
+			userInteractionGroupId = null;
+		}
 		loadDatabaseConfig();
+		loadedGroupId = groupId;
 	}
 
 	const testConnection = async () => {
@@ -73,29 +117,49 @@
 	};
 
 	const saveConfiguration = async () => {
-		if (!groupId) return false;
+		console.log('Database.svelte - saveConfiguration called');
+		console.log('Database.svelte - groupId:', groupId);
+		console.log('Database.svelte - enabled:', enabled);
+		console.log('Database.svelte - connectionString:', connectionString ? 'has value' : 'empty');
+		console.log('Database.svelte - password:', password ? 'has value' : 'empty');
+		
+		if (!groupId) {
+			console.log('Database.svelte - no groupId, returning false');
+			return false;
+		}
 
 		if (enabled && (!connectionString || !password)) {
+			console.log('Database.svelte - missing required fields');
 			toast.error($i18n.t('Connection string and password are required when database is enabled'));
 			return false;
 		}
 
 		loading = true;
+		console.log('Database.svelte - setting loading to true');
 
 		try {
-			await configureGroupDatabase(localStorage.token, groupId, {
+			console.log('Database.svelte - calling configureGroupDatabase API');
+			const result = await configureGroupDatabase(localStorage.token, groupId, {
 				connection_string: connectionString,
 				password: password,
 				enabled: enabled
 			});
+			console.log('Database.svelte - configureGroupDatabase result:', result);
+			console.log('Database.svelte - SAVED DATA IN RESULT:', result.data);
 
 			toast.success($i18n.t('Database configuration saved successfully'));
+			
+			// Keep interaction state and reload the configuration to reflect the saved state
+			console.log('Database.svelte - reloading config after save');
+			await loadDatabaseConfig();
+			
 			return true;
 		} catch (error) {
-			console.error('Error saving database configuration:', error);
+			console.error('Database.svelte - Error saving database configuration:', error);
 			toast.error($i18n.t('Error saving database configuration: ') + (error.message || 'Unknown error'));
 			return false;
 		} finally {
+			console.log('Database.svelte - setting loading to false');
 			loading = false;
 		}
 	};
@@ -115,6 +179,10 @@
 			type="checkbox"
 			id="database-enabled"
 			bind:checked={enabled}
+			on:change={() => {
+				hasUserInteracted = true;
+				userInteractionGroupId = groupId;
+			}}
 			class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-blue-600 focus:ring-blue-500"
 		/>
 		<label for="database-enabled" class="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -133,12 +201,12 @@
 					id="connection-string"
 					bind:value={connectionString}
 					type="text"
-					placeholder="postgresql://user@host:port/database"
+					placeholder="psql -h hostname -p port -d database -U username"
 					class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
 					required={enabled}
 				/>
 				<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-					{$i18n.t('Format: postgresql://username@hostname:port/database_name')}
+					{$i18n.t('Format: psql -h hostname -p port -d database -U username')}
 				</div>
 			</div>
 

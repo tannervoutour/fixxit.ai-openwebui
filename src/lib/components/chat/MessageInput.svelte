@@ -80,6 +80,8 @@
 	import CommandSuggestionList from './MessageInput/CommandSuggestionList.svelte';
 	import Knobs from '../icons/Knobs.svelte';
 	import ValvesModal from '../workspace/common/ValvesModal.svelte';
+	import Commands from '../icons/Commands.svelte';
+	import CommandsModal from './MessageInput/CommandsModal.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -371,6 +373,13 @@
 	$: showCommands = ['/', '#', '@'].includes(command?.charAt(0)) || '\\#' === command?.slice(0, 2);
 	let suggestions = null;
 
+	// Commands modal state
+	let showCommandsModal = false;
+	
+	// Command detection for visual cues
+	$: isLogCommand = prompt.trim().startsWith('/log');
+	$: isHelpCommand = prompt.trim().startsWith('/help');
+
 	let showTools = false;
 
 	let loaded = false;
@@ -482,6 +491,36 @@
 			top: element.scrollHeight,
 			behavior: 'smooth'
 		});
+	};
+
+	const handleCommandSelection = async (event) => {
+		const { command } = event.detail;
+		console.log('Command selected:', command);
+		
+		// Set the prompt first
+		prompt = command + ' ';
+		
+		// Wait for DOM update
+		await tick();
+		
+		// Try to set content via RichTextInput
+		if (chatInputElement) {
+			try {
+				// Try different methods to set content
+				if (chatInputElement.setContent) {
+					chatInputElement.setContent(prompt);
+				} else if (chatInputElement.setMarkdown) {
+					chatInputElement.setMarkdown(prompt);
+				}
+				chatInputElement.focus();
+			} catch (error) {
+				console.log('Error setting content:', error);
+				// Fallback: just focus and the reactive prompt binding should handle the rest
+				chatInputElement.focus();
+			}
+		}
+		
+		showCommandsModal = false;
 	};
 
 	const screenCaptureHandler = async () => {
@@ -1061,7 +1100,11 @@
 							id="message-input-container"
 							class="flex-1 flex flex-col relative w-full shadow-lg rounded-3xl border {$temporaryChatEnabled
 								? 'border-dashed border-gray-100 dark:border-gray-800 hover:border-gray-200 focus-within:border-gray-200 hover:dark:border-gray-700 focus-within:dark:border-gray-700'
-								: ' border-gray-100/30 dark:border-gray-850/30 hover:border-gray-200 focus-within:border-gray-100 hover:dark:border-gray-800 focus-within:dark:border-gray-800'}  transition px-1 bg-white/5 dark:bg-gray-500/5 backdrop-blur-sm dark:text-gray-100"
+								: ' border-gray-100/30 dark:border-gray-850/30 hover:border-gray-200 focus-within:border-gray-100 hover:dark:border-gray-800 focus-within:dark:border-gray-800'}  transition px-1 backdrop-blur-sm dark:text-gray-100 {isLogCommand 
+								? 'bg-green-100/90 dark:bg-green-900/40 border-green-300 dark:border-green-600/60' 
+								: isHelpCommand 
+								? 'bg-blue-100/90 dark:bg-blue-900/40 border-blue-300 dark:border-blue-600/60'
+								: 'bg-white/5 dark:bg-gray-500/5'}"
 							dir={$settings?.chatDirection ?? 'auto'}
 						>
 							{#if atSelectedModel !== undefined}
@@ -1181,7 +1224,7 @@
 
 							<div class="px-2.5">
 								<div
-									class="scrollbar-hidden rtl:text-right ltr:text-left bg-transparent dark:text-gray-100 outline-hidden w-full pb-1 px-1 resize-none h-fit max-h-96 overflow-auto {files.length ===
+									class="scrollbar-hidden rtl:text-right ltr:text-left outline-hidden w-full pb-1 px-1 resize-none h-fit max-h-96 overflow-auto transition-all duration-200 bg-transparent dark:text-gray-100 {files.length ===
 									0
 										? atSelectedModel !== undefined
 											? 'pt-1.5'
@@ -1621,6 +1664,27 @@
 								</div>
 
 								<div class="self-end flex space-x-1 mr-1 shrink-0">
+									<!-- Commands Button -->
+									<div class="relative">
+										<Tooltip content={$i18n.t('Commands')}>
+											<button
+												id="commands-button"
+												class="text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition rounded-full p-1.5 mr-0.5 self-center"
+												type="button"
+												on:click={() => (showCommandsModal = !showCommandsModal)}
+												aria-label="Show available commands"
+											>
+												<Commands className="size-4" strokeWidth="1.75" />
+											</button>
+										</Tooltip>
+										
+										<CommandsModal
+											bind:show={showCommandsModal}
+											onClose={() => (showCommandsModal = false)}
+											on:command-select={handleCommandSelection}
+										/>
+									</div>
+
 									{#if (!history?.currentId || history.messages[history.currentId]?.done == true) && ($_user?.role === 'admin' || ($_user?.permissions?.chat?.stt ?? true))}
 										<!-- {$i18n.t('Record voice')} -->
 										<Tooltip content={$i18n.t('Dictate')}>

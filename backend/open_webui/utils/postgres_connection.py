@@ -126,7 +126,7 @@ class PostgreSQLConnectionManager:
                 "database": config["database"],
                 "user": config["user"],
                 "password": self.decrypt_password(config["password"]),
-                "ssl": config.get("ssl", True)
+                "ssl": "require"  # Use "require" for Supabase SSL
             }
             
             # Test connection
@@ -163,7 +163,7 @@ class PostgreSQLConnectionManager:
                 "database": config["database"],
                 "user": config["user"],
                 "password": self.decrypt_password(config["password"]),
-                "ssl": config.get("ssl", True),
+                "ssl": "require",  # Use "require" for Supabase SSL
                 "min_size": 1,
                 "max_size": 5,  # Limit concurrent connections
                 "command_timeout": 30

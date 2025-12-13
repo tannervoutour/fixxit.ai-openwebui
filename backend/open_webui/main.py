@@ -82,7 +82,6 @@ from open_webui.routers import (
     folders,
     configs,
     groups,
-    logs,
     files,
     functions,
     memories,
@@ -1393,7 +1392,21 @@ app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
 app.include_router(memories.router, prefix="/api/v1/memories", tags=["memories"])
 app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(groups.router, prefix="/api/v1/groups", tags=["groups"])
-app.include_router(logs.router, prefix="/api/v1/logs", tags=["logs"])
+
+# Import logs router - prioritize full implementation, fallback to safe version
+try:
+    from open_webui.routers import logs
+    app.include_router(logs.router, prefix="/api/v1/logs", tags=["logs"])
+    log.info("✅ Full logs router loaded successfully")
+except Exception as e:
+    log.warning(f"⚠️  Full logs router failed to load: {e}")
+    try:
+        from open_webui.routers import logs_safe
+        app.include_router(logs_safe.router, prefix="/api/v1/logs", tags=["logs"])
+        log.info("✅ Safe logs router loaded as fallback")
+    except Exception as e2:
+        log.error(f"❌ Failed to load even safe logs router: {e2}")
+        log.warning("⚠️  Continuing without logs functionality")
 app.include_router(files.router, prefix="/api/v1/files", tags=["files"])
 app.include_router(functions.router, prefix="/api/v1/functions", tags=["functions"])
 app.include_router(

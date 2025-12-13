@@ -308,14 +308,21 @@ async def configure_group_database(
             "configured_by": user.id
         }
         
+        log.info(f"Saving database config for group {id}: enabled={config_form.enabled}, group_data={group_data}")
+        
         # Update group
         updated_group = Groups.update_group_by_id(
             id, 
-            GroupUpdateForm(data=group_data)
+            GroupUpdateForm(
+                name=group.name,
+                description=group.description,
+                data=group_data
+            )
         )
         
         if updated_group:
             log.info(f"Database configured for group {id} by user {user.id}")
+            log.info(f"Updated group data: {updated_group.data}")
             return GroupResponse(
                 **updated_group.model_dump(),
                 member_count=Groups.get_group_member_count_by_id(updated_group.id),
@@ -348,12 +355,14 @@ async def get_group_database_config(id: str, user=Depends(get_admin_user)):
             )
         
         if not group.data or "database" not in group.data:
+            log.info(f"Group {id} has no database config in data: {group.data}")
             return DatabaseConfigResponse(
                 enabled=False,
                 connection={}
             )
         
         db_config = group.data["database"]
+        log.info(f"Group {id} database config: {db_config}")
         
         # Return config without sensitive password
         safe_connection = db_config["connection"].copy()
@@ -410,17 +419,38 @@ async def get_accessible_groups_with_logs(user=Depends(get_verified_user)):
         groups = Groups.get_groups(filter=filter_params)
         
         accessible_groups = []
+        log.info(f"Checking {len(groups)} groups for user {user.id}")
+        
         for group in groups:
+            log.info(f"Group {group.id} ({group.name}): data={group.data}")
             if (group.data and 
                 "database" in group.data and 
                 group.data["database"].get("enabled", False)):
                 
-                accessible_groups.append({
-                    "id": group.id,
-                    "name": group.name,
-                    "description": group.description
-                })
+                # Test actual connection to verify credentials work
+                db_config = group.data["database"].get("connection", {})
+                connection_test_result = await postgres_manager.test_connection(db_config)
+                log.info(f"Group {group.id} database connection test result: {connection_test_result}")
+                
+                if connection_test_result:
+                    log.info(f"Group {group.id} has enabled database with working connection - adding to accessible groups")
+                    accessible_groups.append({
+                        "id": group.id,
+                        "name": group.name,
+                        "description": group.description
+                    })
+                else:
+                    log.error(f"Group {group.id} has enabled database but connection failed")
+                    # Still add to accessible groups so user can see the issue
+                    accessible_groups.append({
+                        "id": group.id,
+                        "name": group.name,
+                        "description": group.description + " (Connection Failed)"
+                    })
+            else:
+                log.info(f"Group {group.id} does not have enabled database")
         
+        log.info(f"Returning {len(accessible_groups)} accessible groups with logs")
         return accessible_groups
         
     except Exception as e:

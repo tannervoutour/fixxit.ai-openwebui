@@ -97,25 +97,29 @@
 	};
 
 	const submitHandler = async () => {
+		// Fixed variable name collision issue v2
 		loading = true;
 
-		// If database tab is selected and component exists, save database config first
-		if (selectedTab === 'database' && databaseComponent) {
+		// If database component exists and we're editing an existing group, save database config first
+		if (databaseComponent && tabs.includes('database') && edit && group?.id) {
 			const databaseSaveSuccess = await databaseComponent.save();
 			if (!databaseSaveSuccess) {
 				loading = false;
 				return; // Don't proceed if database save failed
 			}
+			// If we're only on the database tab, don't close the modal - just save database config
+			loading = false;
+			return; // Database config saved successfully, keep modal open
 		}
 
-		const group = {
+		const submissionData = {
 			name,
 			description,
 			data,
 			permissions
 		};
 
-		await onSubmit(group);
+		await onSubmit(submissionData);
 
 		loading = false;
 		show = false;
