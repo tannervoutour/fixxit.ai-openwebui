@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  fixxit-openwebui:
+    image: fixxit-openwebui:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_HASH: ${BUILD_HASH:-production}
+    container_name: fixxit-openwebui
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+    environment:
+      # Basic configuration
+      - WEBUI_NAME=${WEBUI_NAME:-Fixxit.ai}
+      - WEBUI_URL=${WEBUI_URL:-http://localhost:3000}
+
+      # Authentication & Security
+      - WEBUI_AUTH=${WEBUI_AUTH:-true}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}
+      - DEFAULT_USER_ROLE=${DEFAULT_USER_ROLE:-pending}
+
+      # Database Configuration
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/backend/data/webui.db}
+
+      # Database Password Encryption (CRITICAL for Supabase logs)
+      - DATABASE_PASSWORD_ENCRYPTION_KEY=${DATABASE_PASSWORD_ENCRYPTION_KEY}
+
+      # AI Model Configuration
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_API_BASE_URL=${ANTHROPIC_API_BASE_URL:-https://api.anthropic.com}
+
+      # RAG & File uploads
+      - ENABLE_RAG=${ENABLE_RAG:-true}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1500}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-100}
+      - ENABLE_FILE_UPLOAD=${ENABLE_FILE_UPLOAD:-true}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-25}
+
+      # UI Customization
+      - DEFAULT_THEME=${DEFAULT_THEME:-dark}
+      - SHOW_ADMIN_DETAILS=${SHOW_ADMIN_DETAILS:-false}
+      - ENABLE_COMMUNITY_SHARING=${ENABLE_COMMUNITY_SHARING:-false}
+
+      # Features
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-true}
+      - AUDIO_STT_ENGINE=${AUDIO_STT_ENGINE:-whisper}
+      - AUDIO_TTS_ENGINE=${AUDIO_TTS_ENGINE:-openai}
+
+      # Production settings
+      - ENV=prod
+      - DEBUG=${DEBUG:-false}
+      - WEBUI_BUILD_HASH=${BUILD_HASH:-production}
+
+      # Telemetry
+      - SCARF_NO_ANALYTICS=true
+      - DO_NOT_TRACK=true
+      - ANONYMIZED_TELEMETRY=false
+
+    volumes:
+      # Persistent data - ALL your user data, database, and logs
+      - fixxit_openwebui_data:/app/backend/data
+
+      # Custom configurations (optional)
+      - ./custom/configs:/app/backend/data/configs:ro
+
+      # Custom assets (optional)
+      - ./custom/assets:/app/backend/static/assets:ro
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    restart: unless-stopped
+
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          memory: 1G
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  fixxit_openwebui_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data}
+
+networks:
+  default:
+    name: fixxit-network

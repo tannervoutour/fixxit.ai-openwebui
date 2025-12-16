@@ -311,3 +311,13 @@ cypress/videos
 cypress/screenshots
 .vscode/settings.json
 .webui_secret_key
+
+# Deployment
+.env.production.local
+backups/
+logs/
+data/
+*.tar.gz
+
+# Docker
+docker-compose.override.yml
