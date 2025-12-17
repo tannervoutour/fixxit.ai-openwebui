@@ -321,3 +321,4 @@ data/
 
 # Docker
 docker-compose.override.yml
+docker-archive/
