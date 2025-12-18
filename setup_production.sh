@@ -343,9 +343,9 @@ setup_environment() {
         # Replace placeholder with actual encryption key
         if grep -q "REPLACE_WITH_GENERATED_KEY" "$env_file"; then
             if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s/REPLACE_WITH_GENERATED_KEY/$encryption_key/" "$env_file"
+                sed -i '' "s|REPLACE_WITH_GENERATED_KEY|$encryption_key|" "$env_file"
             else
-                sed -i "s/REPLACE_WITH_GENERATED_KEY/$encryption_key/" "$env_file"
+                sed -i "s|REPLACE_WITH_GENERATED_KEY|$encryption_key|" "$env_file"
             fi
         fi
 
