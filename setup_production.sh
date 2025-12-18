@@ -314,7 +314,8 @@ generate_encryption_key() {
     log_step "Step 6: Generating Encryption Key"
 
     # Generate Fernet key for database password encryption
-    local encryption_key=$(python3 -c "from cryptography.fernet import Fernet; import base64; key = Fernet.generate_key(); print(base64.urlsafe_b64encode(key).decode())")
+    # Fernet.generate_key() already returns a base64-encoded key
+    local encryption_key=$(python3 -c "from cryptography.fernet import Fernet; key = Fernet.generate_key(); print(key.decode())")
 
     echo "$encryption_key"
 }
