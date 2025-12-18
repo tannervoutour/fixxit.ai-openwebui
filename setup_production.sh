@@ -289,7 +289,7 @@ setup_frontend() {
     # Install npm dependencies
     if [ -f "package.json" ]; then
         log "Installing npm dependencies (this may take several minutes)..."
-        npm install --quiet
+        npm install --legacy-peer-deps --quiet
         log_success "npm dependencies installed"
     else
         log_error "package.json not found!"

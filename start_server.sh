@@ -223,7 +223,7 @@ setup_frontend() {
     # Install npm dependencies
     if [ -f "package.json" ]; then
         log "Installing npm dependencies..."
-        npm install
+        npm install --legacy-peer-deps
     else
         log_error "package.json not found in frontend directory"
         exit 1
