@@ -74,6 +74,7 @@ class SignupForm(BaseModel):
     email: str
     password: str
     profile_image_url: Optional[str] = "/user.png"
+    invitation_token: Optional[str] = None  # Optional invitation token for group assignment
 
 
 class AddUserForm(SignupForm):

@@ -1393,6 +1393,11 @@ app.include_router(memories.router, prefix="/api/v1/memories", tags=["memories"]
 app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(groups.router, prefix="/api/v1/groups", tags=["groups"])
 
+# Manager and invitation system
+from open_webui.routers import invitations, managers
+app.include_router(invitations.router, prefix="/api/v1/invitations", tags=["invitations"])
+app.include_router(managers.router, prefix="/api/v1/managers", tags=["managers"])
+
 # Import logs router - prioritize full implementation, fallback to safe version
 try:
     from open_webui.routers import logs

@@ -640,6 +640,25 @@ async def signin(request: Request, response: Response, form_data: SigninForm):
 async def signup(request: Request, response: Response, form_data: SignupForm):
     has_users = Users.has_users()
 
+    # Validate invitation token if provided
+    invitation_group_id = None
+    if form_data.invitation_token:
+        from open_webui.models.invitations import Invitations
+
+        # Validate the invitation token
+        if not Invitations.is_invitation_valid(form_data.invitation_token):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Invalid, expired, or disabled invitation link"
+            )
+
+        # Get invitation details
+        invitation = Invitations.get_invitation_by_token(form_data.invitation_token)
+        if invitation:
+            invitation_group_id = invitation.group_id
+            # Increment usage counter
+            Invitations.increment_invitation_uses(invitation.id)
+
     if WEBUI_AUTH:
         if (
             not request.app.state.config.ENABLE_SIGNUP
@@ -681,6 +700,12 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
         )
 
         if user:
+            # Set pending_group_id if invitation token was provided
+            if invitation_group_id:
+                Users.update_user_by_id(
+                    user.id,
+                    {"pending_group_id": invitation_group_id}
+                )
             expires_delta = parse_duration(request.app.state.config.JWT_EXPIRES_IN)
             expires_at = None
             if expires_delta:
