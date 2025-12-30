@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Plus from '$lib/components/icons/Plus.svelte';
 	import Logs from '$lib/components/icons/Logs.svelte';
 	import Search from '$lib/components/icons/Search.svelte';
 	import { WEBUI_BASE_URL } from '$lib/constants';
-	import { showLogs, showSearch } from '$lib/stores';
+	import { showSearch } from '$lib/stores';
 
 	let selected = '';
 </script>
@@ -78,7 +79,7 @@
 		<Tooltip content="Logs" placement="right">
 			<button
 				class="cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition"
-				on:click={() => showLogs.set(true)}
+				on:click={() => goto('/logs')}
 			>
 				<Logs className="size-5" strokeWidth="2" />
 			</button>
