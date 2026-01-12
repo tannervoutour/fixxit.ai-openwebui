@@ -33,8 +33,8 @@ COMBINED_LOG="$LOGS_DIR/combined.log"
 # Server configuration
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
-BACKEND_HOST="127.0.0.1"
-FRONTEND_HOST="localhost"
+BACKEND_HOST="0.0.0.0"  # Listen on all interfaces for WSL2 access from Windows
+FRONTEND_HOST="0.0.0.0"  # Listen on all interfaces for WSL2 access from Windows
 
 # Colors for output
 RED='\033[0;31m'
@@ -187,6 +187,7 @@ start_backend() {
     export DATABASE_URL="sqlite:///$BACKEND_DIR/data/webui.db"
     export WEBUI_SECRET_KEY="fixxit-development-secret-key-$(date +%s)"
     export DATABASE_PASSWORD_ENCRYPTION_KEY="aEtZV05XcVpuTG03VUNUczc5dlMtalY4WEdleDZheHY0Z0NuZ1I1SnZtaz0="
+    export ENABLE_SIGNUP="false"  # Only allow invitation-based signups for security
     
     # Start backend server from project root to avoid module resolution issues
     cd "$PROJECT_ROOT"
@@ -223,7 +224,7 @@ setup_frontend() {
     # Install npm dependencies
     if [ -f "package.json" ]; then
         log "Installing npm dependencies..."
-        npm install
+        npm install --legacy-peer-deps
     else
         log_error "package.json not found in frontend directory"
         exit 1

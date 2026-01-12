@@ -1,0 +1,42 @@
+# ==============================================================================
+# Deployment Configuration for AWS Lightsail
+# ==============================================================================
+#
+# Copy this file to .deploy-config and fill in your actual values
+# cp .deploy-config.example .deploy-config
+#
+# ==============================================================================
+
+# AWS Lightsail instance hostname or IP address
+# Example: "123.456.789.10" or "my-instance.us-east-1.compute.amazonaws.com"
+DEPLOY_HOST="your-lightsail-host.amazonaws.com"
+
+# SSH username for your Lightsail instance
+# Common values: "ubuntu" (Ubuntu), "ec2-user" (Amazon Linux), "bitnami" (Bitnami)
+DEPLOY_USER="ubuntu"
+
+# SSH port (usually 22)
+DEPLOY_PORT="22"
+
+# Path to your SSH private key for Lightsail
+# Download your Lightsail key from the AWS console
+# Example: ~/.ssh/LightsailDefaultKey-us-east-1.pem
+DEPLOY_KEY="$HOME/.ssh/your-lightsail-key.pem"
+
+# Remote project path on your Lightsail instance
+# This should match where your OpenWebUI project is installed
+DEPLOY_REMOTE_PATH="/home/ubuntu/fixxit_projectFiles/fixxitUI_OpenWebUI"
+
+# ==============================================================================
+# Additional Notes
+# ==============================================================================
+#
+# 1. Make sure your SSH key has correct permissions:
+#    chmod 400 ~/.ssh/your-lightsail-key.pem
+#
+# 2. Test SSH connection manually first:
+#    ssh -i ~/.ssh/your-lightsail-key.pem ubuntu@your-host
+#
+# 3. Ensure rsync is installed on both local and remote machines for faster transfers:
+#    sudo apt install rsync
+#

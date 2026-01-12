@@ -70,6 +70,10 @@ class User(Base):
 
     oauth = Column(JSON, nullable=True)
 
+    # Manager and invitation fields
+    pending_group_id = Column(String, nullable=True)  # Group to assign when approved
+    managed_groups = Column(JSON, nullable=True)  # Array of group IDs user can manage
+
     last_active_at = Column(BigInteger)
     updated_at = Column(BigInteger)
     created_at = Column(BigInteger)
@@ -101,6 +105,10 @@ class UserModel(BaseModel):
     settings: Optional[UserSettings] = None
 
     oauth: Optional[dict] = None
+
+    # Manager and invitation fields
+    pending_group_id: Optional[str] = None
+    managed_groups: Optional[list[str]] = None
 
     last_active_at: int  # timestamp in epoch
     updated_at: int  # timestamp in epoch
@@ -232,6 +240,7 @@ class UserUpdateForm(BaseModel):
     email: str
     profile_image_url: str
     password: Optional[str] = None
+    managed_groups: Optional[list] = None
 
 
 class UsersTable:

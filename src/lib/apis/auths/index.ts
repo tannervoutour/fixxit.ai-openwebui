@@ -290,9 +290,22 @@ export const userSignUp = async (
 	name: string,
 	email: string,
 	password: string,
-	profile_image_url: string
+	profile_image_url: string,
+	invitation_token?: string
 ) => {
 	let error = null;
+
+	const body: any = {
+		name: name,
+		email: email,
+		password: password,
+		profile_image_url: profile_image_url
+	};
+
+	// Add invitation_token if provided
+	if (invitation_token) {
+		body.invitation_token = invitation_token;
+	}
 
 	const res = await fetch(`${WEBUI_API_BASE_URL}/auths/signup`, {
 		method: 'POST',
@@ -300,12 +313,7 @@ export const userSignUp = async (
 			'Content-Type': 'application/json'
 		},
 		credentials: 'include',
-		body: JSON.stringify({
-			name: name,
-			email: email,
-			password: password,
-			profile_image_url: profile_image_url
-		})
+		body: JSON.stringify(body)
 	})
 		.then(async (res) => {
 			if (!res.ok) throw await res.json();

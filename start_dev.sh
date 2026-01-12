@@ -132,9 +132,10 @@ start_dev_backend() {
     export DATABASE_URL="sqlite:///$BACKEND_DIR/data/webui.db"
     export WEBUI_SECRET_KEY="fixxit-development-secret-key"
     export ENV="development"
-    export CORS_ALLOW_ORIGIN="*"
+    export CORS_ALLOW_ORIGIN="http://localhost:$FRONTEND_PORT"
     export ENABLE_SIGNUP="true"
-    
+    export FRONTEND_BASE_URL="http://localhost:$FRONTEND_PORT"
+
     # Development-specific settings
     export GLOBAL_LOG_LEVEL="DEBUG"
     export WEBUI_AUTH_TRUSTED_EMAIL_HEADER=""  # Disable for development

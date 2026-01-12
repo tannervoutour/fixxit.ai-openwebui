@@ -400,7 +400,7 @@ def get_current_user_by_api_key(request, api_key: str):
 
 
 def get_verified_user(user=Depends(get_current_user)):
-    if user.role not in {"user", "admin"}:
+    if user.role not in {"user", "admin", "manager"}:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -410,6 +410,26 @@ def get_verified_user(user=Depends(get_current_user)):
 
 def get_admin_user(user=Depends(get_current_user)):
     if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+    return user
+
+
+def get_manager_user(user=Depends(get_current_user)):
+    """Dependency to require manager role (managers only, not admins)"""
+    if user.role != "manager":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+    return user
+
+
+def get_admin_or_manager_user(user=Depends(get_current_user)):
+    """Dependency to require admin or manager role"""
+    if user.role not in ["admin", "manager"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,

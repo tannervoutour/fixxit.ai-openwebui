@@ -1,621 +1,390 @@
-# Fixxit.ai OpenWebUI - Deployment Guide
-
-## Table of Contents
-1. [Overview](#overview)
-2. [Development Workflow](#development-workflow)
-3. [Production Deployment](#production-deployment)
-4. [Server Setup](#server-setup)
-5. [Deployment Process](#deployment-process)
-6. [Updating the Application](#updating-the-application)
-7. [Troubleshooting](#troubleshooting)
-8. [Backup and Recovery](#backup-and-recovery)
-
----
+# Frontend Deployment Guide
 
 ## Overview
 
-This guide covers the complete workflow for developing and deploying Fixxit.ai OpenWebUI:
+This project uses a **local build + remote deploy** strategy to avoid memory issues when building the large frontend directly on AWS Lightsail.
 
-- **Local Development**: Native Python/Node.js with hot-reload for fast iteration
-- **Production Deployment**: Docker containers for consistent, reliable deployment
-- **CI/CD Ready**: Scripts for automated builds and deployments
+**How it works:**
+1. Build the frontend on your local machine (which has enough memory)
+2. Transfer only the built static files to the Lightsail server
+3. Backend serves the pre-built files (no build needed on server)
 
-### Architecture
+This mirrors how the official `open-webui` Python package works - it includes pre-built frontend assets so users never have to build them.
 
+---
+
+## Initial Setup
+
+### 1. Install Dependencies Locally
+
+Make sure you have Node.js 18+ and npm installed on your local machine:
+
+```bash
+node --version  # Should be 18+
+npm --version   # Should be 6+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Development (Local)                       │
-├─────────────────────────────────────────────────────────────┤
-│  ✓ Native Python + Node.js                                  │
-│  ✓ Hot module replacement (instant updates)                 │
-│  ✓ ./start_dev.sh start                                     │
-│  ✓ Backend: http://127.0.0.1:8080                          │
-│  ✓ Frontend: http://localhost:5173                         │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            │ git push
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   GitHub Repository                          │
-├─────────────────────────────────────────────────────────────┤
-│  ✓ Source code version control                              │
-│  ✓ Branch: fixxit-main                                      │
-│  ✓ Commit history                                           │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            │ git pull + ./deploy-docker.sh pull
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Production Server (Docker)                   │
-├─────────────────────────────────────────────────────────────┤
-│  ✓ Docker container                                          │
-│  ✓ Production-optimized build                                │
-│  ✓ http://your-server:3000                                  │
-│  ✓ Persistent data volumes                                   │
-│  ✓ Auto-restart on failure                                   │
-└─────────────────────────────────────────────────────────────┘
+
+### 2. Configure Deployment Settings
+
+Copy the example config and edit it with your Lightsail details:
+
+```bash
+cp .deploy-config.example .deploy-config
+nano .deploy-config
+```
+
+Fill in your Lightsail instance details:
+```bash
+DEPLOY_HOST="your-instance.amazonaws.com"  # Your Lightsail IP or hostname
+DEPLOY_USER="ubuntu"                        # SSH username
+DEPLOY_PORT="22"                            # SSH port
+DEPLOY_KEY="~/.ssh/YourKey.pem"            # Path to your Lightsail SSH key
+DEPLOY_REMOTE_PATH="/home/ubuntu/path"     # Where OpenWebUI is installed
+```
+
+### 3. Set SSH Key Permissions
+
+```bash
+chmod 400 ~/.ssh/YourLightsailKey.pem
+```
+
+### 4. Test SSH Connection
+
+Verify you can connect to your server:
+
+```bash
+ssh -i ~/.ssh/YourLightsailKey.pem ubuntu@your-instance.amazonaws.com
 ```
 
 ---
 
-## Development Workflow
+## Deploying the Frontend
 
-### 1. Start Local Development
+### Basic Deployment
 
-**Use the native development server for daily work:**
+Build locally and deploy to server:
 
 ```bash
-# Start development servers with hot-reload
-./start_dev.sh start
-
-# Access the application
-# - Frontend: http://localhost:5173 (with HMR)
-# - Backend: http://127.0.0.1:8080 (with auto-reload)
+./deploy-to-lightsail.sh
 ```
 
-### 2. Make Changes
+This will:
+1. ✅ Check dependencies (Node.js, npm, ssh, rsync)
+2. ✅ Test SSH connection
+3. ✅ Build frontend locally (`npm run build`)
+4. ✅ Transfer files to Lightsail (using rsync or scp)
+5. ✅ Show deployment summary
 
-Edit files in `src/` (frontend) or `backend/` (backend):
-- Svelte components update instantly in browser
-- Python code reloads automatically
-- Database schema changes require migration
+### Deployment with Backend Restart
 
-### 3. Test Changes Locally
+Deploy and automatically restart the backend:
 
 ```bash
-# Check server status
-./start_dev.sh status
-
-# View logs
-./start_dev.sh logs
-
-# Restart if needed
-./start_dev.sh restart
+./deploy-to-lightsail.sh --restart
 ```
 
-### 4. Commit Changes
+### Skip Build (Use Existing Build)
+
+If you've already built locally and just want to re-deploy:
 
 ```bash
-# Stage your changes
-git add .
+./deploy-to-lightsail.sh --skip-build
+```
 
-# Commit with descriptive message
-git commit -m "feat: your feature description"
+### Dry Run (See What Would Happen)
 
-# Push to GitHub
-git push origin fixxit-main
+Test the deployment process without making changes:
+
+```bash
+./deploy-to-lightsail.sh --dry-run
 ```
 
 ---
 
-## Production Deployment
+## Advanced Options
 
-### Prerequisites
+### Command-Line Override
 
-**On your production server:**
-- Docker Engine 20.10+
-- Docker Compose V2
-- Git
-- 4GB+ RAM recommended
-- 20GB+ disk space
-
-**Install Docker on Ubuntu/Debian:**
-```bash
-# Install Docker
-curl -fsSL https://get.docker.com | sh
-
-# Add your user to docker group
-sudo usermod -aG docker $USER
-
-# Start Docker service
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Verify installation
-docker --version
-docker compose version
-```
-
----
-
-## Server Setup
-
-### 1. Clone Repository on Server
+You can override config file settings via command-line:
 
 ```bash
-# SSH into your production server
-ssh user@your-server.com
-
-# Clone the repository
-git clone https://github.com/your-username/fixxit-openwebui.git
-cd fixxit-openwebui
-
-# Checkout production branch
-git checkout fixxit-main
+./deploy-to-lightsail.sh \
+  --host 123.456.789.10 \
+  --user ubuntu \
+  --key ~/.ssh/different-key.pem \
+  --remote-path /home/ubuntu/project \
+  --restart
 ```
 
-### 2. Configure Environment
+### All Available Options
 
 ```bash
-# Copy production environment template
-cp .env.production .env.production.local
-
-# Edit with your production settings
-nano .env.production.local
+./deploy-to-lightsail.sh --help
 ```
 
-**Critical settings to configure:**
-
-```bash
-# Basic Configuration
-WEBUI_NAME=Fixxit.ai
-WEBUI_URL=https://fixxit.yourdomain.com
-WEBUI_PORT=3000
-
-# CRITICAL: Generate strong secrets
-WEBUI_SECRET_KEY=$(openssl rand -hex 32)
-
-# CRITICAL: Database password encryption (must match development!)
-DATABASE_PASSWORD_ENCRYPTION_KEY=aEtZV05XcVpuTG03VUNUczc5dlMtalY4WEdleDZheHY0Z0NuZ1I1SnZtaz0=
-
-# Data storage location
-DATA_VOLUME_PATH=/opt/fixxit-openwebui/data
-
-# AI API Keys
-OPENAI_API_KEY=your-actual-openai-key
-ANTHROPIC_API_KEY=your-actual-anthropic-key
-```
-
-### 3. Create Data Directory
-
-```bash
-# Create data directory for persistent storage
-sudo mkdir -p /opt/fixxit-openwebui/data
-sudo chown -R $USER:$USER /opt/fixxit-openwebui
-
-# Or let the deploy script create it
-# It will prompt you automatically
-```
-
-### 4. Initial Deployment
-
-```bash
-# Make scripts executable (if not already)
-chmod +x build-docker.sh deploy-docker.sh
-
-# Build Docker image
-./build-docker.sh
-
-# Deploy to production
-./deploy-docker.sh deploy
-```
-
----
-
-## Deployment Process
-
-### Method 1: Deploy from Local Build (Recommended for First Deploy)
-
-**On your local machine:**
-
-```bash
-# 1. Build Docker image locally
-./build-docker.sh v1.0.0
-
-# 2. Save image to file
-docker save fixxit-openwebui:v1.0.0 | gzip > fixxit-openwebui-v1.0.0.tar.gz
-
-# 3. Transfer to server
-scp fixxit-openwebui-v1.0.0.tar.gz user@your-server:/tmp/
-```
-
-**On your production server:**
-
-```bash
-# 1. Load Docker image
-docker load < /tmp/fixxit-openwebui-v1.0.0.tar.gz
-
-# 2. Deploy
-cd /path/to/fixxit-openwebui
-./deploy-docker.sh deploy v1.0.0
-
-# 3. Verify deployment
-./deploy-docker.sh status
-```
-
-### Method 2: Pull and Build on Server (For Updates)
-
-**On your production server:**
-
-```bash
-# This will:
-# 1. Pull latest code from GitHub
-# 2. Build new Docker image
-# 3. Ask if you want to deploy immediately
-./deploy-docker.sh pull
-```
-
-### Method 3: Manual Build on Server
-
-**On your production server:**
-
-```bash
-# 1. Pull latest code
-git pull origin fixxit-main
-
-# 2. Build image
-./build-docker.sh $(git rev-parse --short HEAD)
-
-# 3. Deploy
-./deploy-docker.sh deploy $(git rev-parse --short HEAD)
-```
-
----
-
-## Updating the Application
-
-### Standard Update Workflow
-
-**1. Make changes locally and test:**
-```bash
-# On local machine
-./start_dev.sh start
-# ... make your changes ...
-# ... test thoroughly ...
-```
-
-**2. Commit and push:**
-```bash
-git add .
-git commit -m "feat: your new feature"
-git push origin fixxit-main
-```
-
-**3. Deploy to production:**
-```bash
-# SSH to server
-ssh user@your-server.com
-cd /path/to/fixxit-openwebui
-
-# Pull and rebuild (easiest method)
-./deploy-docker.sh pull
-```
-
-### Quick Deploy Script
-
-Create this script on your server for even faster deploys:
-
-```bash
-#!/bin/bash
-# File: /usr/local/bin/fixxit-update
-cd /path/to/fixxit-openwebui
-git pull origin fixxit-main
-./build-docker.sh $(git rev-parse --short HEAD)
-./deploy-docker.sh deploy $(git rev-parse --short HEAD)
-```
-
-Then just run: `fixxit-update`
-
----
-
-## Deployment Commands Reference
-
-### Build Commands
-
-```bash
-# Build with auto-generated timestamp tag
-./build-docker.sh
-
-# Build with specific version
-./build-docker.sh v1.0.0
-
-# Build with git commit hash
-./build-docker.sh $(git rev-parse --short HEAD)
-
-# Build and tag as latest
-./build-docker.sh latest
-```
-
-### Deploy Commands
-
-```bash
-# Deploy latest version
-./deploy-docker.sh deploy
-
-# Deploy specific version
-./deploy-docker.sh deploy v1.0.0
-
-# Pull from GitHub and rebuild
-./deploy-docker.sh pull
-
-# Check deployment status
-./deploy-docker.sh status
-
-# View logs
-./deploy-docker.sh logs
-
-# Restart containers
-./deploy-docker.sh restart
-
-# Stop containers
-./deploy-docker.sh stop
-
-# Backup data
-./deploy-docker.sh backup
-```
-
-### Docker Compose Commands
-
-```bash
-# View running containers
-docker compose -f docker-compose.prod.yml ps
-
-# View logs
-docker compose -f docker-compose.prod.yml logs -f
-
-# Restart service
-docker compose -f docker-compose.prod.yml restart
-
-# Stop services
-docker compose -f docker-compose.prod.yml down
-
-# Start services
-docker compose -f docker-compose.prod.yml up -d
-
-# Pull new images
-docker compose -f docker-compose.prod.yml pull
-
-# Rebuild and restart
-docker compose -f docker-compose.prod.yml up -d --build
-```
+Options:
+- `--host <hostname>` - Override deploy host
+- `--user <username>` - Override SSH user
+- `--port <port>` - Override SSH port (default: 22)
+- `--key <path>` - Override SSH key path
+- `--remote-path <path>` - Override remote project directory
+- `--restart` - Restart backend after deployment
+- `--skip-build` - Skip build, use existing /build directory
+- `--dry-run` - Show what would happen without executing
+- `--help` - Show help message
 
 ---
 
 ## Troubleshooting
 
-### Container Won't Start
+### "SSH connection failed"
 
+**Problem:** Cannot connect to Lightsail instance
+
+**Solutions:**
+1. Check your security group allows SSH (port 22) from your IP
+2. Verify SSH key path is correct
+3. Ensure key has correct permissions: `chmod 400 key.pem`
+4. Test manual connection: `ssh -i key.pem user@host`
+
+### "Frontend build failed"
+
+**Problem:** Build errors during npm run build
+
+**Solutions:**
+1. Delete node_modules and reinstall: `rm -rf node_modules && npm install --legacy-peer-deps`
+2. Check Node.js version: `node --version` (needs 18+)
+3. Run build manually to see errors: `npm run build`
+
+### "rsync not found, will use scp (slower)"
+
+**Problem:** rsync not installed (not critical, just slower)
+
+**Solution:** Install rsync for faster transfers:
 ```bash
-# Check logs
-./deploy-docker.sh logs
+# On local machine (WSL/Linux)
+sudo apt install rsync
 
-# Check container status
-docker ps -a
-
-# Inspect container
-docker inspect fixxit-openwebui
-
-# Check environment variables
-docker exec fixxit-openwebui env
+# On Lightsail instance
+ssh to-server
+sudo apt install rsync
 ```
 
-### Database Issues
+### "Backend restart failed"
 
+**Problem:** Automatic restart didn't work
+
+**Solution:** Restart manually on the server:
 ```bash
-# Access container shell
-docker exec -it fixxit-openwebui bash
-
-# Check database file
-ls -lh /app/backend/data/webui.db
-
-# View database location
-echo $DATABASE_URL
+ssh -i ~/.ssh/key.pem ubuntu@your-host
+cd /path/to/project
+./start_server.sh restart
 ```
 
-### Port Already in Use
+### Build works locally but fails on server
+
+**Problem:** This shouldn't happen anymore! The whole point of this deployment method is building locally.
+
+**Note:** If you ever try to build on the server and it crashes, that's the memory issue we're avoiding. Always build locally and deploy with this script.
+
+---
+
+## Deployment Workflow Examples
+
+### First Time Deployment
 
 ```bash
-# Find what's using port 3000
-sudo lsof -i :3000
-sudo netstat -tulpn | grep 3000
+# 1. Setup config
+cp .deploy-config.example .deploy-config
+nano .deploy-config  # Fill in your details
 
-# Change port in .env.production.local
-WEBUI_PORT=3001
+# 2. Test deployment (dry run)
+./deploy-to-lightsail.sh --dry-run
+
+# 3. Deploy for real
+./deploy-to-lightsail.sh --restart
 ```
 
-### Supabase Connection Issues
+### Regular Updates After Code Changes
 
 ```bash
-# Verify encryption key is set
-docker exec fixxit-openwebui env | grep DATABASE_PASSWORD_ENCRYPTION_KEY
-
-# Test database connection from container
-docker exec -it fixxit-openwebui bash
-python -c "import asyncpg; print('asyncpg installed')"
+# Make your frontend changes in src/
+# Then deploy:
+./deploy-to-lightsail.sh --restart
 ```
 
-### Out of Disk Space
+### Quick Re-deploy (Already Built)
 
 ```bash
-# Check disk usage
-df -h
-
-# Clean up old images
-docker image prune -a
-
-# Clean up old containers
-docker container prune
-
-# Clean up volumes (CAREFUL!)
-docker volume prune  # Don't delete fixxit_openwebui_data!
-```
-
-### Memory Issues
-
-```bash
-# Check container memory usage
-docker stats fixxit-openwebui
-
-# Increase memory limit in docker-compose.prod.yml
-# Under deploy.resources.limits.memory: 4G -> 8G
+# If you just deployed and need to redeploy the same build:
+./deploy-to-lightsail.sh --skip-build --restart
 ```
 
 ---
 
-## Backup and Recovery
+## What Gets Deployed
 
-### Manual Backup
+The deployment script transfers the entire `/build` directory which contains:
 
-```bash
-# Using deployment script (recommended)
-./deploy-docker.sh backup
-
-# Manual backup
-tar -czf fixxit-backup-$(date +%Y%m%d).tar.gz /opt/fixxit-openwebui/data
+```
+build/
+├── index.html              # Main SPA entry point
+├── _app/                   # SvelteKit app files
+│   ├── immutable/         # Hashed, cacheable assets
+│   └── version.json       # Build version info
+└── static/                # Static assets (images, fonts, etc.)
+    ├── favicon.png
+    ├── logo.png
+    └── ...
 ```
 
-### Automated Backups
+The backend (`backend/open_webui/main.py`) serves:
+- Static files from `build/static/` at `/static`
+- SPA files from `build/` at `/` (catch-all for SvelteKit routing)
 
-**Create cron job:**
+---
 
-```bash
-# Edit crontab
-crontab -e
+## Understanding the Backend
 
-# Add daily backup at 2 AM
-0 2 * * * cd /path/to/fixxit-openwebui && ./deploy-docker.sh backup
+The backend automatically handles the build directory during startup:
 
-# Add weekly backup and upload to S3 (example)
-0 3 * * 0 cd /path/to/fixxit-openwebui && ./deploy-docker.sh backup && aws s3 cp backups/$(ls -t backups/ | head -1) s3://your-bucket/
+**From `backend/open_webui/env.py:263`:**
+```python
+FRONTEND_BUILD_DIR = Path(os.getenv("FRONTEND_BUILD_DIR", BASE_DIR / "build"))
 ```
 
-### Restore from Backup
-
-```bash
-# Stop container
-./deploy-docker.sh stop
-
-# Restore data
-tar -xzf fixxit-backup-YYYYMMDD.tar.gz -C /opt/fixxit-openwebui/
-
-# Start container
-./deploy-docker.sh deploy
+**From `backend/open_webui/main.py:2327-2336`:**
+```python
+if os.path.exists(FRONTEND_BUILD_DIR):
+    app.mount(
+        "/",
+        SPAStaticFiles(directory=FRONTEND_BUILD_DIR, html=True),
+        name="spa-static-files",
+    )
+else:
+    log.warning(f"Frontend build directory not found at '{FRONTEND_BUILD_DIR}'")
 ```
 
-### Export/Import Docker Image
+So as long as the `/build` directory exists, the backend will serve it automatically. No configuration needed!
+
+---
+
+## Performance Tips
+
+### Use rsync for Faster Transfers
+
+Install rsync on both machines for incremental transfers (only changed files):
 
 ```bash
-# Export image
-docker save fixxit-openwebui:latest | gzip > fixxit-image.tar.gz
+# Local (if not already installed)
+sudo apt install rsync
 
-# Import on another server
-docker load < fixxit-image.tar.gz
+# Remote
+ssh to-server
+sudo apt install rsync
+```
+
+With rsync, subsequent deployments only transfer changed files, making updates much faster.
+
+### Build Caching
+
+The `npm run build` uses Vite's build caching. To clean build cache:
+
+```bash
+rm -rf .svelte-kit node_modules/.vite
+npm run build
 ```
 
 ---
 
-## Production Checklist
+## Integration with Existing Scripts
 
-### Before First Deployment
+This deployment method works alongside your existing scripts:
 
-- [ ] Server meets minimum requirements (4GB RAM, 20GB disk)
-- [ ] Docker and Docker Compose installed
-- [ ] Repository cloned to server
-- [ ] `.env.production.local` configured with strong secrets
-- [ ] `DATABASE_PASSWORD_ENCRYPTION_KEY` matches development
-- [ ] Data directory created and has correct permissions
-- [ ] Firewall rules configured (port 3000 open)
-- [ ] Domain name configured (if using)
-- [ ] SSL certificate set up (if using HTTPS)
+- **`./start_server.sh`** - Start/stop/restart backend (works same as before)
+- **`./start_dev.sh`** - Local development with HMR (for development)
+- **`./deploy-to-lightsail.sh`** - Production deployment (build + transfer)
 
-### After Deployment
-
-- [ ] Application accessible at configured URL
-- [ ] Health check passing (`./deploy-docker.sh status`)
-- [ ] Can log in with admin account
-- [ ] Supabase logs integration working
-- [ ] File uploads working
-- [ ] AI models responding correctly
-- [ ] Backup cron job configured
-- [ ] Monitoring configured (optional)
-
-### Regular Maintenance
-
-- [ ] Weekly: Check disk space and logs
-- [ ] Monthly: Test backup restoration
-- [ ] Quarterly: Update base images and dependencies
-- [ ] As needed: Apply security patches
-- [ ] Always: Monitor application performance
+Typical workflow:
+1. Develop locally using `./start_dev.sh`
+2. Test changes in development mode
+3. Deploy to production with `./deploy-to-lightsail.sh --restart`
 
 ---
 
-## Security Best Practices
+## Security Notes
 
-1. **Never commit** `.env.production.local` to git
-2. **Use strong secrets** generated with `openssl rand -hex 32`
-3. **Keep encryption key secure** - losing it means losing access to group database passwords
-4. **Set up firewall** rules to restrict access
-5. **Use HTTPS** in production with valid SSL certificates
-6. **Regular updates** of base images and dependencies
-7. **Backup regularly** and test restoration procedures
-8. **Monitor logs** for suspicious activity
-9. **Limit SSH access** to production server
-10. **Use non-root user** for Docker operations
+1. **Never commit `.deploy-config`** - It contains server credentials
+   - Already added to `.gitignore`
 
----
+2. **Protect your SSH keys:**
+   ```bash
+   chmod 400 ~/.ssh/your-key.pem
+   ```
 
-## Quick Reference
+3. **Use SSH key authentication** - Never use password authentication for deployment
 
-### Local Development
-```bash
-./start_dev.sh start     # Start development servers
-./start_dev.sh stop      # Stop servers
-./start_dev.sh logs      # View logs
-```
-
-### Build for Production
-```bash
-./build-docker.sh v1.0.0     # Build image
-```
-
-### Deploy to Production
-```bash
-./deploy-docker.sh pull      # Pull from GitHub and deploy
-./deploy-docker.sh deploy    # Deploy existing image
-./deploy-docker.sh status    # Check status
-./deploy-docker.sh logs      # View logs
-./deploy-docker.sh backup    # Create backup
-```
-
-### Emergency Commands
-```bash
-./deploy-docker.sh stop      # Stop everything
-./deploy-docker.sh restart   # Quick restart
-docker logs fixxit-openwebui # View raw logs
-```
+4. **Restrict Lightsail security groups** - Only allow SSH from your IP if possible
 
 ---
 
-## Support
+## FAQ
 
-For issues or questions:
-1. Check logs: `./deploy-docker.sh logs`
-2. Check status: `./deploy-docker.sh status`
-3. Review CLAUDE_KEEPUP.md for implementation details
-4. Check GitHub issues: https://github.com/your-repo/issues
+### Do I need to install Node.js on Lightsail?
+
+**No!** That's the beauty of this approach. The server only needs:
+- Python 3.11+ (for backend)
+- The pre-built frontend files
+
+No Node.js, npm, or build tools needed on the server.
+
+### What if I don't have rsync?
+
+The script automatically falls back to `scp` if rsync isn't available. It's slower but works fine.
+
+### Can I deploy from Windows?
+
+Yes! If you're using WSL2 (which you are), this script works perfectly. If using Windows directly, you'd need to adapt for PowerShell or use WSL.
+
+### Does this work with the official open-webui package?
+
+This setup is for your customized fork. The official `open-webui` pip package includes pre-built frontend assets in the wheel file, so users never build anything - they just `pip install open-webui` and run it.
+
+Your customizations require building, so we build locally (like the official package CI does) and deploy the artifacts.
+
+### How do I check if deployment worked?
+
+After deployment:
+
+1. **Check backend logs:**
+   ```bash
+   ssh to-server
+   cd /path/to/project
+   tail -f logs/backend.log
+   ```
+
+2. **Run health check:**
+   ```bash
+   ./health_check.sh
+   ```
+
+3. **Access in browser:**
+   - Go to your Lightsail public IP or domain
+   - You should see your frontend loading
 
 ---
 
-**Last Updated**: December 2025
-**Version**: 1.0
-**Maintainer**: Fixxit.ai Team
+## Getting Help
+
+If you encounter issues:
+
+1. Check troubleshooting section above
+2. Review deployment logs
+3. Test SSH connection manually
+4. Verify backend is running: `./start_server.sh status`
+5. Check backend logs: `tail -f logs/backend.log`
+
+---
+
+**Last Updated:** 2025-12-27
+**Version:** 1.0.0

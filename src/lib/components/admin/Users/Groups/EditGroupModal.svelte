@@ -9,6 +9,7 @@
 	import Permissions from './Permissions.svelte';
 	import Users from './Users.svelte';
 	import Database from './Database.svelte';
+	import ManagementDashboard from './ManagementDashboard.svelte';
 	import UserPlusSolid from '$lib/components/icons/UserPlusSolid.svelte';
 	import WrenchSolid from '$lib/components/icons/WrenchSolid.svelte';
 	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
@@ -25,7 +26,7 @@
 
 	export let custom = true;
 
-	export let tabs = ['general', 'permissions', 'users', 'database'];
+	export let tabs = ['general', 'permissions', 'users', 'database', 'management_dashboard'];
 
 	let selectedTab = 'general';
 	let loading = false;
@@ -33,6 +34,7 @@
 
 	let userCount = 0;
 	let databaseComponent = null;
+	let managementDashboardComponent = null;
 
 	export let name = '';
 	export let description = '';
@@ -110,6 +112,18 @@
 			// If we're only on the database tab, don't close the modal - just save database config
 			loading = false;
 			return; // Database config saved successfully, keep modal open
+		}
+
+		// If management dashboard component exists and we're editing an existing group, save management dashboard config
+		if (managementDashboardComponent && tabs.includes('management_dashboard') && edit && group?.id) {
+			const managementDashboardSaveSuccess = await managementDashboardComponent.save();
+			if (!managementDashboardSaveSuccess) {
+				loading = false;
+				return; // Don't proceed if management dashboard save failed
+			}
+			// If we're only on the management dashboard tab, don't close the modal - just save config
+			loading = false;
+			return; // Management dashboard config saved successfully, keep modal open
 		}
 
 		const submissionData = {
@@ -283,6 +297,31 @@
 									<div class=" self-center">{$i18n.t('Database')}</div>
 								</button>
 							{/if}
+
+							{#if tabs.includes('management_dashboard') && custom}
+								<button
+									class="px-0.5 py-1 max-w-fit w-fit rounded-lg flex-1 lg:flex-none flex text-right transition {selectedTab ===
+									'management_dashboard'
+										? ''
+										: ' text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'}"
+									on:click={() => {
+										selectedTab = 'management_dashboard';
+									}}
+									type="button"
+								>
+									<div class=" self-center mr-2">
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											viewBox="0 0 16 16"
+											fill="currentColor"
+											class="w-4 h-4"
+										>
+											<path fill-rule="evenodd" d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v1h10V4a1 1 0 0 0-1-1H4ZM3 7v5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7H3Z" clip-rule="evenodd" />
+										</svg>
+									</div>
+									<div class=" self-center">{$i18n.t('Management Dashboard')}</div>
+								</button>
+							{/if}
 						</div>
 
 						<div class="flex-1 mt-1 lg:mt-1 lg:h-[30rem] lg:max-h-[30rem] flex flex-col">
@@ -307,10 +346,16 @@
 										groupId={group?.id}
 										{edit}
 									/>
+								{:else if selectedTab == 'management_dashboard'}
+									<ManagementDashboard
+										bind:this={managementDashboardComponent}
+										groupId={group?.id}
+										{edit}
+									/>
 								{/if}
 							</div>
 
-							{#if ['general', 'permissions', 'database'].includes(selectedTab)}
+							{#if ['general', 'permissions', 'database', 'management_dashboard'].includes(selectedTab)}
 								<div class="flex justify-end pt-3 text-sm font-medium gap-1.5">
 									<button
 										class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full flex flex-row space-x-1 items-center {loading
