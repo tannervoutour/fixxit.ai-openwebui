@@ -7,6 +7,7 @@
 	import { goto } from '$app/navigation';
 
 	import { updateUserById, getUserGroupsById } from '$lib/apis/users';
+	import { getGroups } from '$lib/apis/groups';
 
 	import Modal from '$lib/components/common/Modal.svelte';
 	import localizedFormat from 'dayjs/plugin/localizedFormat';
@@ -28,9 +29,11 @@
 
 	const init = () => {
 		if (selectedUser) {
-			_user = selectedUser;
+			_user = { ...selectedUser };
 			_user.password = '';
+			_user.managed_groups = selectedUser.managed_groups || [];
 			loadUserGroups();
+			loadAllGroups();
 		}
 	};
 
@@ -39,10 +42,12 @@
 		role: 'pending',
 		name: '',
 		email: '',
-		password: ''
+		password: '',
+		managed_groups: []
 	};
 
 	let userGroups: any[] | null = null;
+	let allGroups: any[] = [];
 
 	const submitHandler = async () => {
 		const res = await updateUserById(localStorage.token, selectedUser.id, _user).catch((error) => {
@@ -63,6 +68,25 @@
 			toast.error(`${error}`);
 			return null;
 		});
+	};
+
+	const loadAllGroups = async () => {
+		const res = await getGroups(localStorage.token).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (res) {
+			allGroups = res;
+		}
+	};
+
+	const toggleManagedGroup = (groupId: string) => {
+		if (_user.managed_groups.includes(groupId)) {
+			_user.managed_groups = _user.managed_groups.filter(id => id !== groupId);
+		} else {
+			_user.managed_groups = [..._user.managed_groups, groupId];
+		}
 	};
 </script>
 
@@ -144,11 +168,41 @@
 												required
 											>
 												<option value="admin">{$i18n.t('Admin')}</option>
+												<option value="manager">{$i18n.t('Manager')}</option>
 												<option value="user">{$i18n.t('User')}</option>
 												<option value="pending">{$i18n.t('Pending')}</option>
 											</select>
 										</div>
 									</div>
+
+									{#if _user.role === 'manager'}
+										<div class="flex flex-col w-full">
+											<div class="mb-1 text-xs text-gray-500">{$i18n.t('Managed Groups')}</div>
+											<div class="text-xs text-gray-500 mb-2">
+												{$i18n.t('Select which groups this manager can manage')}
+											</div>
+
+											{#if allGroups.length === 0}
+												<div class="text-xs text-gray-500 italic">
+													{$i18n.t('No groups available')}
+												</div>
+											{:else}
+												<div class="flex flex-col space-y-1 max-h-32 overflow-y-auto">
+													{#each allGroups as group}
+														<label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-850 p-1 rounded">
+															<input
+																type="checkbox"
+																checked={_user.managed_groups.includes(group.id)}
+																on:change={() => toggleManagedGroup(group.id)}
+																class="cursor-pointer"
+															/>
+															<span class="text-sm">{group.name}</span>
+														</label>
+													{/each}
+												</div>
+											{/if}
+										</div>
+									{/if}
 
 									<div class="flex flex-col w-full">
 										<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Name')}</div>

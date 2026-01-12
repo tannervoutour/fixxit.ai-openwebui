@@ -13,6 +13,7 @@
 
 	let submitting = false;
 	let selectedGroupId = '';
+	let showAdvancedParams = false;
 
 	// Problem category management
 	let showNewCategoryInput = false;
@@ -179,234 +180,262 @@
 			></textarea>
 		</div>
 
-		<!-- Problem Category -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Problem Category')}
-			</label>
+		<!-- Advanced Parameters Toggle -->
+		<div class="pt-2">
+			<button
+				type="button"
+				on:click={() => (showAdvancedParams = !showAdvancedParams)}
+				class="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+			>
+				<svg
+					class="size-4 transition-transform duration-200 {showAdvancedParams ? 'rotate-90' : ''}"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M9 5l7 7-7 7"
+					/>
+				</svg>
+				<span>{$i18n.t('Advanced Parameters')} ({$i18n.t('recommended')})</span>
+			</button>
+		</div>
 
-			{#if showNewCategoryInput}
-				<!-- New Category Input -->
-				<div class="space-y-2">
-					<div class="flex items-center space-x-2">
-						<input
-							type="text"
-							bind:value={newCategoryValue}
-							placeholder={$i18n.t('Enter new category name')}
-							class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-							on:keydown={(e) => e.key === 'Enter' && handleNewCategorySubmit()}
-						/>
-						<button
-							type="button"
-							on:click={handleNewCategorySubmit}
-							class="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-						>
-							{$i18n.t('Add')}
-						</button>
-						<button
-							type="button"
-							on:click={() => {
-								showNewCategoryInput = false;
-								newCategoryValue = '';
-							}}
-							class="px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
-						>
-							{$i18n.t('Cancel')}
-						</button>
-					</div>
-				</div>
-			{:else}
-				<!-- Category Dropdown -->
-				<div class="space-y-2">
-					<select
-						value={formData.problem_category}
-						on:change={(e) => handleCategoryChange(e.target.value)}
-						class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-					>
-						<option value="">{$i18n.t('Select category')}</option>
-						{#each problemCategories as category}
-							<option value={category}>{category}</option>
-						{/each}
-						<option value="_new_category" class="italic text-blue-600 dark:text-blue-400">
-							+ {$i18n.t('Add new category')}
-						</option>
-					</select>
+		{#if showAdvancedParams}
+			<div class="space-y-4 pl-2 border-l-2 border-gray-200 dark:border-gray-700">
+				<!-- Problem Category -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Problem Category')}
+					</label>
 
-					{#if formData.problem_category}
-						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{$i18n.t('Selected')}: <span class="font-medium">{formData.problem_category}</span>
+					{#if showNewCategoryInput}
+						<!-- New Category Input -->
+						<div class="space-y-2">
+							<div class="flex items-center space-x-2">
+								<input
+									type="text"
+									bind:value={newCategoryValue}
+									placeholder={$i18n.t('Enter new category name')}
+									class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+									on:keydown={(e) => e.key === 'Enter' && handleNewCategorySubmit()}
+								/>
+								<button
+									type="button"
+									on:click={handleNewCategorySubmit}
+									class="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+								>
+									{$i18n.t('Add')}
+								</button>
+								<button
+									type="button"
+									on:click={() => {
+										showNewCategoryInput = false;
+										newCategoryValue = '';
+									}}
+									class="px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+								>
+									{$i18n.t('Cancel')}
+								</button>
+							</div>
+						</div>
+					{:else}
+						<!-- Category Dropdown -->
+						<div class="space-y-2">
+							<select
+								value={formData.problem_category}
+								on:change={(e) => handleCategoryChange(e.target.value)}
+								class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+							>
+								<option value="">{$i18n.t('Select category')}</option>
+								{#each problemCategories as category}
+									<option value={category}>{category}</option>
+								{/each}
+								<option value="_new_category" class="italic text-blue-600 dark:text-blue-400">
+									+ {$i18n.t('Add new category')}
+								</option>
+							</select>
+
+							{#if formData.problem_category}
+								<div class="text-xs text-gray-600 dark:text-gray-400">
+									{$i18n.t('Selected')}: <span class="font-medium">{formData.problem_category}</span>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>
-			{/if}
-		</div>
 
-		<!-- Root Cause -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Root Cause')}
-			</label>
-			<textarea
-				bind:value={formData.root_cause}
-				rows="2"
-				placeholder={$i18n.t('Identified root cause of the issue')}
-				class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-			></textarea>
-		</div>
-
-		<!-- Solution Steps -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Solution Steps')}
-			</label>
-			{#each formData.solution_steps as step, index}
-				<div class="flex items-center space-x-2 mb-2">
-					<input
-						type="text"
-						bind:value={step}
-						placeholder={$i18n.t('Solution step')}
-						class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-						on:input={(e) => updateFormArrayItem('solution_steps', index, e.target.value)}
-					/>
-					{#if formData.solution_steps.length > 1}
-						<button
-							type="button"
-							on:click={() => removeFormArrayItem('solution_steps', index)}
-							class="px-2 py-2 text-red-600 hover:text-red-800"
-						>
-							×
-						</button>
-					{/if}
+				<!-- Root Cause -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Root Cause')}
+					</label>
+					<textarea
+						bind:value={formData.root_cause}
+						rows="2"
+						placeholder={$i18n.t('Identified root cause of the issue')}
+						class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+					></textarea>
 				</div>
-			{/each}
-			<button
-				type="button"
-				on:click={() => addFormArrayItem('solution_steps')}
-				class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-			>
-				+ {$i18n.t('Add step')}
-			</button>
-		</div>
 
-		<!-- Tools Required -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Tools Required')}
-			</label>
-			{#each formData.tools_required as tool, index}
-				<div class="flex items-center space-x-2 mb-2">
-					<input
-						type="text"
-						bind:value={tool}
-						placeholder={$i18n.t('Tool or equipment needed')}
-						class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-						on:input={(e) => updateFormArrayItem('tools_required', index, e.target.value)}
-					/>
-					{#if formData.tools_required.length > 1}
-						<button
-							type="button"
-							on:click={() => removeFormArrayItem('tools_required', index)}
-							class="px-2 py-2 text-red-600 hover:text-red-800"
-						>
-							×
-						</button>
-					{/if}
-				</div>
-			{/each}
-			<button
-				type="button"
-				on:click={() => addFormArrayItem('tools_required')}
-				class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-			>
-				+ {$i18n.t('Add tool')}
-			</button>
-		</div>
-
-		<!-- Equipment Group -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Equipment Involved')}
-			</label>
-			{#each formData.equipment_group as equipment, index}
-				<div class="flex items-center space-x-2 mb-2">
-					<select
-						bind:value={equipment}
-						class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-						on:change={(e) => updateFormArrayItem('equipment_group', index, e.target.value)}
+				<!-- Solution Steps -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Solution Steps')}
+					</label>
+					{#each formData.solution_steps as step, index}
+						<div class="flex items-center space-x-2 mb-2">
+							<input
+								type="text"
+								bind:value={step}
+								placeholder={$i18n.t('Solution step')}
+								class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+								on:input={(e) => updateFormArrayItem('solution_steps', index, e.target.value)}
+							/>
+							{#if formData.solution_steps.length > 1}
+								<button
+									type="button"
+									on:click={() => removeFormArrayItem('solution_steps', index)}
+									class="px-2 py-2 text-red-600 hover:text-red-800"
+								>
+									×
+								</button>
+							{/if}
+						</div>
+					{/each}
+					<button
+						type="button"
+						on:click={() => addFormArrayItem('solution_steps')}
+						class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
 					>
-						<option value="">{$i18n.t('Select equipment')}</option>
-						{#each availableEquipment as eq}
-							<option value={eq.conventional_name}>{eq.conventional_name}</option>
-						{/each}
-					</select>
-					{#if formData.equipment_group.length > 1}
+						+ {$i18n.t('Add step')}
+					</button>
+				</div>
+
+				<!-- Tools Required -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Tools Required')}
+					</label>
+					{#each formData.tools_required as tool, index}
+						<div class="flex items-center space-x-2 mb-2">
+							<input
+								type="text"
+								bind:value={tool}
+								placeholder={$i18n.t('Tool or equipment needed')}
+								class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+								on:input={(e) => updateFormArrayItem('tools_required', index, e.target.value)}
+							/>
+							{#if formData.tools_required.length > 1}
+								<button
+									type="button"
+									on:click={() => removeFormArrayItem('tools_required', index)}
+									class="px-2 py-2 text-red-600 hover:text-red-800"
+								>
+									×
+								</button>
+							{/if}
+						</div>
+					{/each}
+					<button
+						type="button"
+						on:click={() => addFormArrayItem('tools_required')}
+						class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+					>
+						+ {$i18n.t('Add tool')}
+					</button>
+				</div>
+
+				<!-- Equipment Group -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Equipment Involved')}
+					</label>
+					{#each formData.equipment_group as equipment, index}
+						<div class="flex items-center space-x-2 mb-2">
+							<select
+								bind:value={equipment}
+								class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+								on:change={(e) => updateFormArrayItem('equipment_group', index, e.target.value)}
+							>
+								<option value="">{$i18n.t('Select equipment')}</option>
+								{#each availableEquipment as eq}
+									<option value={eq.conventional_name}>{eq.conventional_name}</option>
+								{/each}
+							</select>
+							{#if formData.equipment_group.length > 1}
+								<button
+									type="button"
+									on:click={() => removeFormArrayItem('equipment_group', index)}
+									class="px-2 py-2 text-red-600 hover:text-red-800"
+								>
+									×
+								</button>
+							{/if}
+						</div>
+					{/each}
+					<button
+						type="button"
+						on:click={() => addFormArrayItem('equipment_group')}
+						class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+					>
+						+ {$i18n.t('Add equipment')}
+					</button>
+				</div>
+
+				<!-- Tags -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Tags')} <span class="text-xs text-gray-500">(max 3)</span>
+					</label>
+					{#each formData.tags as tag, index}
+						<div class="flex items-center space-x-2 mb-2">
+							<input
+								type="text"
+								bind:value={tag}
+								placeholder={$i18n.t('Classification tag')}
+								class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+								on:input={(e) => updateFormArrayItem('tags', index, e.target.value)}
+							/>
+							{#if formData.tags.length > 1}
+								<button
+									type="button"
+									on:click={() => removeFormArrayItem('tags', index)}
+									class="px-2 py-2 text-red-600 hover:text-red-800"
+								>
+									×
+								</button>
+							{/if}
+						</div>
+					{/each}
+					{#if formData.tags.length < 3}
 						<button
 							type="button"
-							on:click={() => removeFormArrayItem('equipment_group', index)}
-							class="px-2 py-2 text-red-600 hover:text-red-800"
+							on:click={() => addFormArrayItem('tags')}
+							class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
 						>
-							×
+							+ {$i18n.t('Add tag')}
 						</button>
 					{/if}
 				</div>
-			{/each}
-			<button
-				type="button"
-				on:click={() => addFormArrayItem('equipment_group')}
-				class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-			>
-				+ {$i18n.t('Add equipment')}
-			</button>
-		</div>
 
-		<!-- Tags -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Tags')} <span class="text-xs text-gray-500">(max 3)</span>
-			</label>
-			{#each formData.tags as tag, index}
-				<div class="flex items-center space-x-2 mb-2">
-					<input
-						type="text"
-						bind:value={tag}
-						placeholder={$i18n.t('Classification tag')}
-						class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-						on:input={(e) => updateFormArrayItem('tags', index, e.target.value)}
-					/>
-					{#if formData.tags.length > 1}
-						<button
-							type="button"
-							on:click={() => removeFormArrayItem('tags', index)}
-							class="px-2 py-2 text-red-600 hover:text-red-800"
-						>
-							×
-						</button>
-					{/if}
+				<!-- Notes -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						{$i18n.t('Additional Notes')}
+					</label>
+					<textarea
+						bind:value={formData.notes}
+						rows="2"
+						placeholder={$i18n.t('Any additional notes or observations')}
+						class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+					></textarea>
 				</div>
-			{/each}
-			{#if formData.tags.length < 3}
-				<button
-					type="button"
-					on:click={() => addFormArrayItem('tags')}
-					class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-				>
-					+ {$i18n.t('Add tag')}
-				</button>
-			{/if}
-		</div>
-
-		<!-- Notes -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-				{$i18n.t('Additional Notes')}
-			</label>
-			<textarea
-				bind:value={formData.notes}
-				rows="2"
-				placeholder={$i18n.t('Any additional notes or observations')}
-				class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
-			></textarea>
-		</div>
+			</div>
+		{/if}
 
 		<!-- Submit Button -->
 		<div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">

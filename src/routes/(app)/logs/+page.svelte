@@ -14,6 +14,7 @@
 	import Logs from '$lib/components/icons/Logs.svelte';
 	import LogsList from '$lib/components/logs/LogsList.svelte';
 	import LogsCreate from '$lib/components/logs/LogsCreate.svelte';
+	import ManagementDashboardButton from '$lib/components/chat/ManagementDashboardButton.svelte';
 
 	import { getGroupsWithLogs, getProblemCategories, getEquipmentGroups } from '$lib/apis/logs';
 
@@ -23,6 +24,9 @@
 	let availableGroups = [];
 	let problemCategories = [];
 	let availableEquipment = [];
+
+	// Track selected group for filtering logs
+	let selectedGroupId = '';
 
 	// Get tab from URL query parameter, default to 'view'
 	$: {
@@ -104,6 +108,8 @@
 					</div>
 
 					<div class="self-center flex items-center gap-1">
+						<ManagementDashboardButton />
+
 						{#if $user !== undefined && $user !== null}
 							<UserMenu
 								className="max-w-[240px]"
@@ -158,7 +164,7 @@
 
 				<!-- Tab Content -->
 				{#if selectedTab === 'view'}
-					<LogsList {availableGroups} />
+					<LogsList bind:selectedGroupId {availableGroups} />
 				{:else if selectedTab === 'create'}
 					<LogsCreate
 						{availableGroups}

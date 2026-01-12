@@ -11,9 +11,29 @@
 	export let selectedUser = '';
 	export let titleSearch = '';
 	export let categories = [];
+	export let availableGroups = [];
+	export let selectedGroupId = '';
 </script>
 
 <div class="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+	<!-- Group Selector (shown when user has multiple groups) -->
+	{#if availableGroups.length > 1}
+		<div class="pb-4 border-b border-gray-200 dark:border-gray-700">
+			<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+				{$i18n.t('Select Group')}
+			</label>
+			<select
+				bind:value={selectedGroupId}
+				class="w-full max-w-md rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm"
+			>
+				<option value="">{$i18n.t('All Groups')}</option>
+				{#each availableGroups as group}
+					<option value={group.id}>{group.name}</option>
+				{/each}
+			</select>
+		</div>
+	{/if}
+
 	<!-- Primary Filters Row -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 		<div>

@@ -643,6 +643,7 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
     # Validate invitation token if provided
     invitation_group_id = None
     if form_data.invitation_token:
+        log.info(f"Signup with invitation token: {form_data.invitation_token[:16]}...")
         from open_webui.models.invitations import Invitations
 
         # Validate the invitation token
@@ -656,23 +657,30 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
         invitation = Invitations.get_invitation_by_token(form_data.invitation_token)
         if invitation:
             invitation_group_id = invitation.group_id
+            log.info(f"Invitation validated, group_id: {invitation_group_id}")
             # Increment usage counter
             Invitations.increment_invitation_uses(invitation.id)
+        else:
+            log.warning("Invitation token validated but invitation not found")
 
     if WEBUI_AUTH:
         if (
             not request.app.state.config.ENABLE_SIGNUP
             or not request.app.state.config.ENABLE_LOGIN_FORM
         ):
-            if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
+            # Allow signup with valid invitation token even if signup is disabled
+            if not form_data.invitation_token:
+                if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
+                    raise HTTPException(
+                        status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
+                    )
+    else:
+        # Allow signup with valid invitation token even if signup is disabled
+        if not form_data.invitation_token:
+            if has_users:
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
                 )
-    else:
-        if has_users:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
-            )
 
     if not validate_email_format(form_data.email.lower()):
         raise HTTPException(
@@ -690,7 +698,12 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
 
         hashed = get_password_hash(form_data.password)
 
-        role = "admin" if not has_users else request.app.state.config.DEFAULT_USER_ROLE
+        # Users with valid invitation tokens get "user" role automatically
+        if invitation_group_id:
+            role = "user"
+        else:
+            role = "admin" if not has_users else request.app.state.config.DEFAULT_USER_ROLE
+
         user = Auths.insert_new_auth(
             form_data.email.lower(),
             hashed,
@@ -700,12 +713,14 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
         )
 
         if user:
-            # Set pending_group_id if invitation token was provided
+            # Add user to group if invitation token was provided
             if invitation_group_id:
-                Users.update_user_by_id(
-                    user.id,
-                    {"pending_group_id": invitation_group_id}
-                )
+                log.info(f"Adding user {user.id} to group {invitation_group_id} via invitation")
+                from open_webui.models.groups import GroupMembers
+                result = GroupMembers.add_user_to_group(user.id, invitation_group_id)
+                log.info(f"Group assignment result: {result}")
+            else:
+                log.info(f"No invitation_group_id found, skipping group assignment")
             expires_delta = parse_duration(request.app.state.config.JWT_EXPIRES_IN)
             expires_at = None
             if expires_delta:

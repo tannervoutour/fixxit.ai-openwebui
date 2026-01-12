@@ -90,6 +90,8 @@ class GroupMemberModel(BaseModel):
     created_at: Optional[int] = None  # timestamp in epoch
     updated_at: Optional[int] = None  # timestamp in epoch
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 ####################
 # Forms
@@ -530,4 +532,74 @@ class GroupTable:
             return None
 
 
+class GroupMemberTable:
+    def add_user_to_group(self, user_id: str, group_id: str) -> bool:
+        """Add a user to a group"""
+        with get_db() as db:
+            try:
+                # Check if already exists
+                existing = db.query(GroupMember).filter(
+                    GroupMember.user_id == user_id,
+                    GroupMember.group_id == group_id
+                ).first()
+
+                if existing:
+                    return True  # Already in group
+
+                # Add new member
+                member = GroupMember(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    group_id=group_id,
+                    created_at=int(time.time()),
+                    updated_at=int(time.time())
+                )
+                db.add(member)
+                db.commit()
+                return True
+            except Exception as e:
+                log.exception(e)
+                return False
+
+    def remove_user_from_group(self, user_id: str, group_id: str) -> bool:
+        """Remove a user from a group"""
+        with get_db() as db:
+            try:
+                db.query(GroupMember).filter(
+                    GroupMember.user_id == user_id,
+                    GroupMember.group_id == group_id
+                ).delete()
+                db.commit()
+                return True
+            except Exception as e:
+                log.exception(e)
+                return False
+
+    def is_user_in_group(self, user_id: str, group_id: str) -> bool:
+        """Check if user is in a group"""
+        with get_db() as db:
+            member = db.query(GroupMember).filter(
+                GroupMember.user_id == user_id,
+                GroupMember.group_id == group_id
+            ).first()
+            return member is not None
+
+    def get_group_members(self, group_id: str) -> list[GroupMemberModel]:
+        """Get all members of a group"""
+        with get_db() as db:
+            members = db.query(GroupMember).filter(
+                GroupMember.group_id == group_id
+            ).all()
+            return [GroupMemberModel.model_validate(m) for m in members]
+
+    def get_groups_by_member_id(self, user_id: str) -> list[str]:
+        """Get all group IDs that a user is a member of"""
+        with get_db() as db:
+            members = db.query(GroupMember.group_id).filter(
+                GroupMember.user_id == user_id
+            ).all()
+            return [m.group_id for m in members]
+
+
 Groups = GroupTable()
+GroupMembers = GroupMemberTable()

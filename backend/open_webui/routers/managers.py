@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field, EmailStr
 
 from open_webui.models.users import Users, UserModel
-from open_webui.models.groups import Groups, GroupMember
+from open_webui.models.groups import Groups, GroupMembers
 from open_webui.models.auths import Auths
 from open_webui.utils.auth import get_admin_or_manager_user, get_password_hash
 from open_webui.utils.managers import (
@@ -183,7 +183,7 @@ async def approve_user(
 
     # Add user to their pending group if specified
     if pending_user.pending_group_id:
-        GroupMember.add_user_to_group(request.user_id, pending_user.pending_group_id)
+        GroupMembers.add_user_to_group(request.user_id, pending_user.pending_group_id)
         # Clear pending_group_id after adding to group
         Users.update_user_by_id(request.user_id, {"pending_group_id": None})
 
@@ -260,7 +260,7 @@ async def get_group_members(
         )
 
     # Get group members
-    members = GroupMember.get_group_members(group_id)
+    members = GroupMembers.get_group_members(group_id)
     member_users = [Users.get_user_by_id(m.user_id) for m in members]
     member_users = [u for u in member_users if u]  # Filter out None
 
@@ -294,14 +294,14 @@ async def add_user_to_group(
         )
 
     # Check if user is already in group
-    if GroupMember.is_user_in_group(request.user_id, group_id):
+    if GroupMembers.is_user_in_group(request.user_id, group_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User is already in this group"
         )
 
     # Add user to group
-    GroupMember.add_user_to_group(request.user_id, group_id)
+    GroupMembers.add_user_to_group(request.user_id, group_id)
 
     logger.info(f"User {request.user_id} added to group {group_id} by manager {manager.id}")
 
@@ -329,15 +329,30 @@ async def remove_user_from_group(
             detail="You do not have permission to remove users from this group"
         )
 
+    # Get the target user
+    target_user = Users.get_user_by_id(user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Prevent managers from removing admin users
+    if target_user.role == "admin" and not is_admin(manager):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot remove admin users from groups"
+        )
+
     # Verify user is in group
-    if not GroupMember.is_user_in_group(user_id, group_id):
+    if not GroupMembers.is_user_in_group(user_id, group_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User is not in this group"
         )
 
     # Remove user from group
-    GroupMember.remove_user_from_group(user_id, group_id)
+    GroupMembers.remove_user_from_group(user_id, group_id)
 
     logger.info(f"User {user_id} removed from group {group_id} by manager {manager.id}")
 
@@ -365,6 +380,13 @@ async def edit_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+
+    # Prevent managers from editing admin users
+    if target_user.role == "admin" and not is_admin(manager):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot edit admin users"
         )
 
     # Check permissions
@@ -459,7 +481,11 @@ async def get_my_managed_groups(
 
     Admins get all groups, managers get their assigned groups.
     """
+    logger.info(f"get_my_managed_groups called by user {manager.id}, role: {manager.role}")
+    logger.info(f"Manager managed_groups field: {manager.managed_groups}, type: {type(manager.managed_groups)}")
+
     managed_group_ids = get_managed_groups(manager)
+    logger.info(f"Managed group IDs: {managed_group_ids}")
 
     if is_admin(manager):
         # Admin gets all groups
@@ -475,7 +501,7 @@ async def get_my_managed_groups(
                 "id": g.id,
                 "name": g.name,
                 "description": g.description,
-                "member_count": len(GroupMember.get_group_members(g.id))
+                "member_count": Groups.get_group_member_count_by_id(g.id)
             }
             for g in groups
         ]

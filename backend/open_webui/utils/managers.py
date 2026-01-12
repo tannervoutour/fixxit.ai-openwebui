@@ -10,7 +10,7 @@ The manager role allows users to:
 
 from typing import Optional
 from open_webui.models.users import UserModel
-from open_webui.models.groups import Groups, GroupMember
+from open_webui.models.groups import Groups, GroupMembers
 
 
 def is_manager(user: UserModel) -> bool:
@@ -77,7 +77,7 @@ def can_manage_user(manager: UserModel, target_user_id: str) -> bool:
     if is_manager(manager) and manager.managed_groups:
         # Check if target user is in any of manager's groups
         for group_id in manager.managed_groups:
-            if GroupMember.is_user_in_group(target_user_id, group_id):
+            if GroupMembers.is_user_in_group(target_user_id, group_id):
                 return True
 
     return False
@@ -97,7 +97,7 @@ def get_manageable_users(manager: UserModel) -> list[str]:
 
     if is_manager(manager) and manager.managed_groups:
         for group_id in manager.managed_groups:
-            members = GroupMember.get_group_members(group_id)
+            members = GroupMembers.get_group_members(group_id)
             user_ids.update([member.user_id for member in members])
 
     return list(user_ids)

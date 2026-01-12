@@ -17,7 +17,8 @@
 	let hasMore = false;
 	let loading = false;
 
-	// Filtering state
+	// Filtering state (export selectedGroupId so parent can bind to it)
+	export let selectedGroupId = '';
 	let selectedCategory = '';
 	let selectedBusinessImpact = '';
 	let verifiedFilter: string = '';
@@ -31,7 +32,11 @@
 	let selectedUser = '';
 	let titleSearch = '';
 
+	// Track expanded logs
+	let expandedLogs = new Set();
+
 	// Track previous filter values to detect changes
+	let prevSelectedGroupId = '';
 	let prevSelectedCategory = '';
 	let prevVerifiedFilter = '';
 	let prevEquipmentFilter = '';
@@ -41,6 +46,15 @@
 	let prevDateRangeBefore = '';
 	let prevSelectedUser = '';
 	let prevTitleSearch = '';
+
+	const toggleLogExpand = (logId: string) => {
+		if (expandedLogs.has(logId)) {
+			expandedLogs.delete(logId);
+		} else {
+			expandedLogs.add(logId);
+		}
+		expandedLogs = expandedLogs; // Trigger reactivity
+	};
 
 	const loadLogs = async () => {
 		try {
@@ -52,6 +66,9 @@
 				sort_by: sortBy,
 				sort_desc: sortDesc
 			};
+
+			// Group filter
+			if (selectedGroupId) params.group_id = selectedGroupId;
 
 			// Basic filters
 			if (selectedCategory) params.category = selectedCategory;
@@ -100,6 +117,7 @@
 
 	// Reload logs when any filter changes
 	$: if (
+		selectedGroupId !== prevSelectedGroupId ||
 		selectedCategory !== prevSelectedCategory ||
 		verifiedFilter !== prevVerifiedFilter ||
 		equipmentFilter !== prevEquipmentFilter ||
@@ -110,6 +128,7 @@
 		selectedUser !== prevSelectedUser ||
 		titleSearch !== prevTitleSearch
 	) {
+		prevSelectedGroupId = selectedGroupId;
 		prevSelectedCategory = selectedCategory;
 		prevVerifiedFilter = verifiedFilter;
 		prevEquipmentFilter = equipmentFilter;
@@ -126,6 +145,7 @@
 <div class="space-y-4">
 	<!-- Filters Component -->
 	<LogsFilters
+		bind:selectedGroupId
 		bind:selectedCategory
 		bind:verifiedFilter
 		bind:equipmentFilter
@@ -135,6 +155,7 @@
 		bind:selectedUser
 		bind:titleSearch
 		{categories}
+		{availableGroups}
 	/>
 
 	<!-- Logs List -->
@@ -178,9 +199,19 @@
 						</div>
 					</div>
 
-					<p class="text-sm text-gray-600 dark:text-gray-300 mb-2 line-clamp-2">
-						{log.insight_content}
-					</p>
+					<div class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+						<p class={expandedLogs.has(log.id) ? '' : 'line-clamp-2'}>
+							{log.insight_content}
+						</p>
+						{#if log.insight_content && log.insight_content.length > 150}
+							<button
+								on:click={() => toggleLogExpand(log.id)}
+								class="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
+							>
+								{expandedLogs.has(log.id) ? $i18n.t('Show Less') : $i18n.t('Show More')}
+							</button>
+						{/if}
+					</div>
 
 					<div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
 						<span>{$i18n.t('By')} {log.user_name}</span>

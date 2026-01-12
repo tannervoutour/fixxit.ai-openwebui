@@ -81,17 +81,25 @@ async def create_new_group(form_data: GroupForm, user=Depends(get_admin_user)):
 
 
 @router.get("/id/{id}", response_model=Optional[GroupResponse])
-async def get_group_by_id(id: str, user=Depends(get_admin_user)):
+async def get_group_by_id(id: str, user=Depends(get_verified_user)):
     group = Groups.get_group_by_id(id)
-    if group:
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ERROR_MESSAGES.NOT_FOUND,
+        )
+
+    # Allow admins to access any group, or allow users/managers to access groups they're members of
+    user_ids = Groups.get_group_user_ids_by_id(group.id)
+    if user.role == "admin" or (user_ids and user.id in user_ids):
         return GroupResponse(
             **group.model_dump(),
             member_count=Groups.get_group_member_count_by_id(group.id),
         )
     else:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ERROR_MESSAGES.NOT_FOUND,
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.UNAUTHORIZED,
         )
 
 
@@ -414,9 +422,20 @@ async def test_database_connection_endpoint(
 async def get_accessible_groups_with_logs(user=Depends(get_verified_user)):
     """Get groups accessible to user that have database configuration enabled"""
     try:
-        # Get user's groups
-        filter_params = {"member_id": user.id} if user.role != "admin" else {}
-        groups = Groups.get_groups(filter=filter_params)
+        # Get user's groups based on role
+        if user.role == "admin":
+            # Admins see all groups
+            groups = Groups.get_groups(filter={})
+        elif user.role == "manager":
+            # Managers see their managed groups
+            if user.managed_groups:
+                groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
+                groups = [g for g in groups if g is not None]
+            else:
+                groups = []
+        else:
+            # Regular users see groups they are members of
+            groups = Groups.get_groups(filter={"member_id": user.id})
         
         accessible_groups = []
         log.info(f"Checking {len(groups)} groups for user {user.id}")

@@ -11,6 +11,7 @@ Managers and admins can:
 import logging
 import secrets
 import time
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,6 +25,9 @@ from open_webui.constants import ERROR_MESSAGES
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Get frontend URL from environment variable, default to production
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://app.fixxit.ai")
 
 
 ############################
@@ -78,9 +82,12 @@ def generate_invitation_token() -> str:
 
 def format_invitation_response(
     invitation: InvitationModel,
-    base_url: str = "https://app.fixxit.ai"
+    base_url: str = None
 ) -> InvitationResponse:
     """Format invitation with group details and full URL"""
+    if base_url is None:
+        base_url = FRONTEND_BASE_URL
+
     group = Groups.get_group_by_id(invitation.group_id)
     group_name = group.name if group else "Unknown Group"
 

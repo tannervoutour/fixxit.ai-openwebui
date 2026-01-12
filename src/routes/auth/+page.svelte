@@ -35,6 +35,7 @@
 	let confirmPassword = '';
 
 	let ldapUsername = '';
+	let invitationToken = '';
 
 	const setSessionUser = async (sessionUser, redirectPath: string | null = null) => {
 		if (sessionUser) {
@@ -73,7 +74,7 @@
 			}
 		}
 
-		const sessionUser = await userSignUp(name, email, password, generateInitialsImage(name)).catch(
+		const sessionUser = await userSignUp(name, email, password, generateInitialsImage(name), invitationToken || undefined).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -166,6 +167,14 @@
 		const error = $page.url.searchParams.get('error');
 		if (error) {
 			toast.error(error);
+		}
+
+		// Extract invitation token from URL
+		invitationToken = $page.url.searchParams.get('invite') || '';
+		console.log('Invitation token from URL:', invitationToken);
+		if (invitationToken) {
+			console.log('Setting mode to signup due to invitation token');
+			mode = 'signup';
 		}
 
 		await oauthCallbackHandler();

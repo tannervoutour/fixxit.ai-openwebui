@@ -546,15 +546,19 @@ async def update_user_by_id(
             Auths.update_user_password_by_id(user_id, hashed)
 
         Auths.update_email_by_id(user_id, form_data.email.lower())
-        updated_user = Users.update_user_by_id(
-            user_id,
-            {
-                "role": form_data.role,
-                "name": form_data.name,
-                "email": form_data.email.lower(),
-                "profile_image_url": form_data.profile_image_url,
-            },
-        )
+
+        update_data = {
+            "role": form_data.role,
+            "name": form_data.name,
+            "email": form_data.email.lower(),
+            "profile_image_url": form_data.profile_image_url,
+        }
+
+        # Add managed_groups if provided
+        if form_data.managed_groups is not None:
+            update_data["managed_groups"] = form_data.managed_groups
+
+        updated_user = Users.update_user_by_id(user_id, update_data)
 
         if updated_user:
             return updated_user
