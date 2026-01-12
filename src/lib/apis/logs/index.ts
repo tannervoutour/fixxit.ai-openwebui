@@ -3,10 +3,15 @@ import { WEBUI_API_BASE_URL } from '$lib/constants';
 export const getLogs = async (
 	token: string,
 	params: {
+		group_id?: string;
 		category?: string;
 		business_impact?: string;
 		verified?: boolean;
 		equipment?: string;
+		user_filter?: string;
+		title_search?: string;
+		date_after?: string;
+		date_before?: string;
 		limit?: number;
 		offset?: number;
 		sort_by?: string;

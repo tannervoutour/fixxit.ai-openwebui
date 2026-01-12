@@ -7,6 +7,7 @@ import logging
 import time
 import uuid
 import json
+import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 
@@ -45,6 +46,7 @@ class LogCreationRequest(BaseModel):
 class LogResponse(BaseModel):
     """Response model for log data"""
     id: int
+    session_id: str
     insight_title: str
     insight_content: str
     user_name: str
@@ -54,6 +56,12 @@ class LogResponse(BaseModel):
     log_type: str
     activation_status: str
     verified: bool
+    verification_method: Optional[str] = None
+    verified_at: Optional[str] = None
+    verified_by: Optional[str] = None
+    ai_generated_at: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_confidence_score: Optional[float] = None
     problem_category: Optional[str] = None
     root_cause: Optional[str] = None
     solution_steps: Optional[List[str]] = None
@@ -62,7 +70,6 @@ class LogResponse(BaseModel):
     equipment_group: Optional[List[str]] = None
     notes: Optional[str] = None
     business_impact: Optional[str] = None
-    reusability_score: Optional[float] = None
     # Group context (added by API)
     source_group_name: Optional[str] = None
     source_group_id: Optional[str] = None
@@ -116,14 +123,27 @@ def format_log_entry(log_data: dict, group_name: str, group_id: str) -> LogRespo
         if isinstance(json_str, (list, dict)):
             return json_str
         if isinstance(json_str, str):
+            # First try to parse as JSON
             try:
-                return json.loads(json_str)
+                parsed = json.loads(json_str)
+                # Ensure it's a list
+                if isinstance(parsed, list):
+                    return parsed
+                # If it's a single value, wrap it in a list
+                return [parsed] if parsed else None
             except (json.JSONDecodeError, ValueError):
-                return None
+                # If JSON parsing fails, check if it looks like a numbered list
+                if re.match(r'^\d+\.', json_str.strip()):
+                    # Split by numbered list pattern (1. 2. 3. etc)
+                    items = re.split(r'\d+\.\s*', json_str)
+                    return [item.strip() for item in items if item.strip()]
+                # Otherwise, treat as comma-separated string
+                return [item.strip() for item in json_str.split(',') if item.strip()]
         return None
     
     return LogResponse(
         id=log_data.get("id"),
+        session_id=log_data.get("session_id", ""),
         insight_title=log_data.get("insight_title", ""),
         insight_content=log_data.get("insight_content", ""),
         user_name=log_data.get("user_name", ""),
@@ -133,6 +153,12 @@ def format_log_entry(log_data: dict, group_name: str, group_id: str) -> LogRespo
         log_type=log_data.get("log_type", ""),
         activation_status=log_data.get("activation_status", ""),
         verified=log_data.get("verified", False),
+        verification_method=log_data.get("verification_method"),
+        verified_at=safe_datetime_to_string(log_data.get("verified_at")),
+        verified_by=log_data.get("verified_by"),
+        ai_generated_at=safe_datetime_to_string(log_data.get("ai_generated_at")),
+        ai_model=log_data.get("ai_model"),
+        ai_confidence_score=log_data.get("ai_confidence_score"),
         problem_category=log_data.get("problem_category"),
         root_cause=log_data.get("root_cause"),
         solution_steps=safe_json_parse(log_data.get("solution_steps")),
@@ -141,7 +167,6 @@ def format_log_entry(log_data: dict, group_name: str, group_id: str) -> LogRespo
         equipment_group=safe_json_parse(log_data.get("equipment_group")),
         notes=log_data.get("notes"),
         business_impact=log_data.get("business_impact"),
-        reusability_score=log_data.get("reusability_score"),
         source_group_name=group_name,
         source_group_id=group_id
     )
@@ -149,39 +174,44 @@ def format_log_entry(log_data: dict, group_name: str, group_id: str) -> LogRespo
 def create_log_entry_data(request: LogCreationRequest, user: UserModel) -> dict:
     """Create log entry dictionary from request and user context"""
     now = datetime.utcnow()
-    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S.%f+00")
-    
+
+    # Generate a session ID (required field, NOT NULL in schema)
+    session_id = f"manual_{uuid.uuid4().hex[:16]}"
+
     return {
-        # Auto-generated fields (as per user specifications)
-        "source": "log_modal",                    # Column 3
-        "verified": False,                        # Column 4
-        "verification_method": None,              # Column 5
-        "ai_confidence_score": None,              # Column 6
-        "log_type": "user_generated",             # Column 7
-        "activation_status": "Inactive",          # Column 9
-        "created_at": timestamp_str,              # Column 10
-        "updated_at": timestamp_str,              # Column 11
-        "verified_at": None,                      # Column 12
-        "verified_by": None,                      # Column 13
-        "ai_model": None,                         # Column 16
-        "diagram_referenced": None,               # Column 21
-        "spare_parts_mentioned": None,            # Column 22
-        "verification_confidence": None,          # Column 23
-        "session_id": None,                       # Column 2 - not necessary per user
-        
-        # User context
-        "user_name": user.name,                   # From OpenWebUI user
-        
-        # User input fields
-        "insight_title": request.insight_title,          # Column 14
-        "insight_content": request.insight_content,      # Column 15
-        "problem_category": request.problem_category,    # Column 17
-        "root_cause": request.root_cause,               # Column 18
-        "solution_steps": request.solution_steps,       # Column 19
-        "tools_required": request.tools_required,       # Column 20
-        "tags": request.tags,                           # Column 24
-        "equipment_group": request.equipment_group,      # Column 25
-        "notes": request.notes,                         # Column 8
+        # Required fields
+        "session_id": session_id,                       # Required, NOT NULL
+        "user_name": user.name,                         # Required, NOT NULL
+        "insight_title": request.insight_title,         # Required, NOT NULL
+        "insight_content": request.insight_content,     # Required, NOT NULL
+
+        # Auto-generated fields
+        "source": "log_modal",
+        "log_type": "user_generated",
+        "activation_status": "active",
+        "verified": False,
+        "verification_method": "manual",
+
+        # Timestamps (let database handle defaults, but we can set them)
+        "created_at": now,
+        "updated_at": now,
+        "ai_generated_at": None,
+
+        # Optional verification fields
+        "verified_at": None,
+        "verified_by": None,
+        "ai_model": None,
+        "ai_confidence_score": None,
+
+        # User input fields (JSONB fields should be lists/dicts, not strings)
+        "problem_category": request.problem_category,
+        "root_cause": request.root_cause,
+        "solution_steps": json.dumps(request.solution_steps) if request.solution_steps else None,
+        "tools_required": json.dumps(request.tools_required) if request.tools_required else None,
+        "tags": json.dumps(request.tags) if request.tags else None,
+        "equipment_group": json.dumps(request.equipment_group) if request.equipment_group else None,
+        "notes": request.notes,
+        "business_impact": None,  # Not in request model, but exists in schema
     }
 
 ############################
@@ -191,6 +221,7 @@ def create_log_entry_data(request: LogCreationRequest, user: UserModel) -> dict:
 @router.get("/", response_model=LogsListResponse)
 async def get_logs(
     user=Depends(get_verified_user),
+    group_id: Optional[str] = Query(None, description="Filter by specific group"),
     category: Optional[str] = Query(None, description="Filter by problem category"),
     business_impact: Optional[str] = Query(None, description="Filter by business impact"),
     verified: Optional[bool] = Query(None, description="Filter by verification status"),
@@ -205,15 +236,32 @@ async def get_logs(
     sort_desc: bool = Query(True, description="Sort in descending order")
 ):
     """Get logs accessible to user based on group membership with filtering and sorting"""
-    
+
     # Add debug info to response headers for frontend visibility
     debug_info = []
-    
+
     try:
         # Get user's groups with database configuration
-        filter_params = {"member_id": user.id} if user.role != "admin" else {}
-        user_groups = Groups.get_groups(filter=filter_params)
-        
+        if user.role == "admin":
+            # Admins see all groups
+            user_groups = Groups.get_groups(filter={})
+        elif user.role == "manager":
+            # Managers see their managed groups
+            if user.managed_groups:
+                user_groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
+                user_groups = [g for g in user_groups if g is not None]
+            else:
+                user_groups = []
+        else:
+            # Regular users see groups they are members of
+            user_groups = Groups.get_groups(filter={"member_id": user.id})
+
+        # Filter to specific group if requested
+        if group_id:
+            user_groups = [g for g in user_groups if g.id == group_id]
+            debug_info.append(f"Filtering to specific group: {group_id}")
+            logger.info(f"get_logs: Filtering to specific group: {group_id}")
+
         debug_info.append(f"User {user.id} has {len(user_groups)} groups")
         logger.info(f"get_logs: User {user.id} has {len(user_groups)} groups")
         
@@ -236,7 +284,17 @@ async def get_logs(
             try:
                 async with postgres_manager.get_connection(group.id, db_config) as conn:
                     # Build query with filters
-                    query = "SELECT * FROM logs WHERE activation_status != 'deleted'"
+                    # Explicitly select columns to avoid issues with the embedding vector column
+                    query = """
+                    SELECT id, session_id, user_name, insight_title, insight_content,
+                           ai_generated_at, ai_model, ai_confidence_score, equipment_group,
+                           problem_category, root_cause, solution_steps, tools_required,
+                           verified, verification_method, verified_at, verified_by,
+                           business_impact, tags, source, log_type, notes,
+                           activation_status, created_at, updated_at
+                    FROM logs
+                    WHERE activation_status != 'deleted'
+                    """
                     query_params = []
                     
                     # Apply filters
@@ -348,14 +406,25 @@ async def create_log(
     """Create new log entry in group's database"""
     try:
         # Verify user access to group
-        user_groups = Groups.get_groups_by_member_id(user.id)
-        user_group_ids = [g.id for g in user_groups]
-        
-        if user.role != "admin" and group_id not in user_group_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=ERROR_MESSAGES.DEFAULT("Access denied to group"),
-            )
+        if user.role == "admin":
+            # Admins have access to all groups
+            pass
+        elif user.role == "manager":
+            # Managers have access to their managed groups
+            if not user.managed_groups or group_id not in user.managed_groups:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=ERROR_MESSAGES.DEFAULT("Access denied to group"),
+                )
+        else:
+            # Regular users have access to groups they are members of
+            user_groups = Groups.get_groups_by_member_id(user.id)
+            user_group_ids = [g.id for g in user_groups]
+            if group_id not in user_group_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=ERROR_MESSAGES.DEFAULT("Access denied to group"),
+                )
         
         # Get database configuration
         db_config = await get_group_database_connection(group_id)
@@ -405,9 +474,20 @@ async def get_problem_categories(user=Depends(get_verified_user)):
     """Get unique problem categories from user's accessible group databases"""
     try:
         # Get user's groups with database configuration
-        filter_params = {"member_id": user.id} if user.role != "admin" else {}
-        user_groups = Groups.get_groups(filter=filter_params)
-        
+        if user.role == "admin":
+            # Admins see all groups
+            user_groups = Groups.get_groups(filter={})
+        elif user.role == "manager":
+            # Managers see their managed groups
+            if user.managed_groups:
+                user_groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
+                user_groups = [g for g in user_groups if g is not None]
+            else:
+                user_groups = []
+        else:
+            # Regular users see groups they are members of
+            user_groups = Groups.get_groups(filter={"member_id": user.id})
+
         all_categories = set()
         
         # Fetch categories from each group's database
@@ -452,9 +532,20 @@ async def get_equipment_groups(
     """Get equipment groups from user's accessible group databases for dropdown"""
     try:
         # Get user's groups with database configuration
-        filter_params = {"member_id": user.id} if user.role != "admin" else {}
-        user_groups = Groups.get_groups(filter=filter_params)
-        
+        if user.role == "admin":
+            # Admins see all groups
+            user_groups = Groups.get_groups(filter={})
+        elif user.role == "manager":
+            # Managers see their managed groups
+            if user.managed_groups:
+                user_groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
+                user_groups = [g for g in user_groups if g is not None]
+            else:
+                user_groups = []
+        else:
+            # Regular users see groups they are members of
+            user_groups = Groups.get_groups(filter={"member_id": user.id})
+
         all_equipment = {}  # Use dict to avoid duplicates by conventional_name
         
         # Fetch equipment from each group's database
