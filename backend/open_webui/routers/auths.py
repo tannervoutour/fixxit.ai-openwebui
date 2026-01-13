@@ -158,6 +158,7 @@ async def get_session_user(
         "status_message": user.status_message,
         "status_expires_at": user.status_expires_at,
         "permissions": user_permissions,
+        "managed_groups": user.managed_groups,
     }
 
 
