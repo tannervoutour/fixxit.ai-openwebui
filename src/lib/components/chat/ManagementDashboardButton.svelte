@@ -13,23 +13,29 @@
 
 	const loadGroups = async () => {
 		console.log('[Management Dashboard] User role:', $user?.role);
+		console.log('[Management Dashboard] User managed_groups:', $user?.managed_groups);
+
 		if ($user?.role !== 'manager') {
 			console.log('[Management Dashboard] Not a manager, skipping');
 			return;
 		}
 
+		// Check if user has managed_groups assigned
+		if (!$user?.managed_groups || $user.managed_groups.length === 0) {
+			console.log('[Management Dashboard] No managed groups assigned to this manager');
+			return;
+		}
+
 		try {
 			loading = true;
-			console.log('[Management Dashboard] Loading groups...');
-			const groupsResponse = await getGroupsWithLogs(localStorage.token);
-			console.log('[Management Dashboard] Groups response:', groupsResponse);
+			console.log('[Management Dashboard] Loading managed groups...');
 
-			if (groupsResponse) {
-				// Filter groups that have management dashboard URLs
-				const groupsWithDashboard = [];
-				for (const group of groupsResponse) {
-					console.log('[Management Dashboard] Checking group:', group.name, group.id);
-					const fullGroup = await getGroupById(localStorage.token, group.id);
+			// Fetch details for each managed group
+			const groupsWithDashboard = [];
+			for (const groupId of $user.managed_groups) {
+				try {
+					console.log('[Management Dashboard] Fetching group:', groupId);
+					const fullGroup = await getGroupById(localStorage.token, groupId);
 					console.log('[Management Dashboard] Full group data:', fullGroup);
 					console.log('[Management Dashboard] Dashboard URL:', fullGroup?.data?.management_dashboard_url);
 
@@ -41,10 +47,13 @@
 						});
 						console.log('[Management Dashboard] Added group with dashboard:', fullGroup.name);
 					}
+				} catch (error) {
+					console.error('[Management Dashboard] Error loading group', groupId, ':', error);
 				}
-				availableGroups = groupsWithDashboard;
-				console.log('[Management Dashboard] Final available groups:', availableGroups);
 			}
+
+			availableGroups = groupsWithDashboard;
+			console.log('[Management Dashboard] Final available groups:', availableGroups);
 		} catch (error) {
 			console.error('[Management Dashboard] Error loading groups:', error);
 		} finally {
@@ -76,6 +85,11 @@
 			showDropdown = false;
 		}
 	};
+
+	// Reload groups when user changes or managed_groups changes
+	$: if ($user) {
+		loadGroups();
+	}
 
 	onMount(() => {
 		loadGroups();
