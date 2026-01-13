@@ -299,4 +299,5 @@ export type SessionUser = {
 	name: string;
 	role: string;
 	profile_image_url: string;
+	managed_groups?: string[];
 };

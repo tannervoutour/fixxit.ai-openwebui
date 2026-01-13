@@ -101,6 +101,7 @@ class SessionUserInfoResponse(SessionUserResponse, UserStatus):
     bio: Optional[str] = None
     gender: Optional[str] = None
     date_of_birth: Optional[datetime.date] = None
+    managed_groups: Optional[List[str]] = None
 
 
 @router.get("/", response_model=SessionUserInfoResponse)
