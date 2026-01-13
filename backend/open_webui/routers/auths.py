@@ -143,6 +143,8 @@ async def get_session_user(
         user.id, request.app.state.config.USER_PERMISSIONS
     )
 
+    log.info(f"[SESSION] User {user.id} role={user.role} managed_groups={user.managed_groups}")
+
     return {
         "token": token,
         "token_type": "Bearer",
