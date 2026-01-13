@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from open_webui.models.auths import Auths
 from open_webui.models.oauth_sessions import OAuthSessions
 
-from open_webui.models.groups import Groups
+from open_webui.models.groups import Groups, GroupMember
 from open_webui.models.chats import Chats
 from open_webui.models.users import (
     UserModel,
@@ -559,6 +559,34 @@ async def update_user_by_id(
             update_data["managed_groups"] = form_data.managed_groups
 
         updated_user = Users.update_user_by_id(user_id, update_data)
+
+        # Auto-add manager as member of their managed groups
+        if updated_user and form_data.role == "manager" and form_data.managed_groups:
+            from open_webui.internal.db import get_db
+            import uuid
+            import time
+
+            for group_id in form_data.managed_groups:
+                try:
+                    with get_db() as db:
+                        # Check if already a member
+                        result = db.execute(
+                            "SELECT 1 FROM group_member WHERE group_id = ? AND user_id = ?",
+                            (group_id, user_id)
+                        ).fetchone()
+
+                        if not result:
+                            # Add as member
+                            db.execute(
+                                """INSERT INTO group_member (id, group_id, user_id, created_at, updated_at)
+                                   VALUES (?, ?, ?, ?, ?)""",
+                                (str(uuid.uuid4()), group_id, user_id, int(time.time()), int(time.time()))
+                            )
+                            db.commit()
+                            log.info(f"Auto-added manager {user_id} as member of group {group_id}")
+                except Exception as e:
+                    log.warning(f"Could not add manager {user_id} to group {group_id}: {e}")
+                    pass
 
         if updated_user:
             return updated_user
