@@ -89,9 +89,10 @@ async def get_group_by_id(id: str, user=Depends(get_verified_user)):
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    # Allow admins to access any group, or allow users/managers to access groups they're members of
+    # Allow admins to access any group, managers to access their managed groups, or members to access their groups
     user_ids = Groups.get_group_user_ids_by_id(group.id)
-    if user.role == "admin" or (user_ids and user.id in user_ids):
+    is_manager = user.role == "manager" and user.managed_groups and id in user.managed_groups
+    if user.role == "admin" or is_manager or (user_ids and user.id in user_ids):
         return GroupResponse(
             **group.model_dump(),
             member_count=Groups.get_group_member_count_by_id(group.id),
