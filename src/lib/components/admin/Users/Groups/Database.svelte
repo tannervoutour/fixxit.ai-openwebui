@@ -183,7 +183,7 @@
 				hasUserInteracted = true;
 				userInteractionGroupId = groupId;
 			}}
-			class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-blue-600 focus:ring-blue-500"
+			class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-fixxit-primary focus:ring-fixxit-primary"
 		/>
 		<label for="database-enabled" class="text-sm font-medium text-gray-900 dark:text-gray-100">
 			{$i18n.t('Enable database integration')}
@@ -202,7 +202,7 @@
 					bind:value={connectionString}
 					type="text"
 					placeholder="psql -h hostname -p port -d database -U username"
-					class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+					class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-fixxit-primary focus:ring-fixxit-primary"
 					required={enabled}
 				/>
 				<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">

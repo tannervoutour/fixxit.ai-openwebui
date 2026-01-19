@@ -33,6 +33,18 @@
 /* --app-text-scale is updated via the UI Scale slider (Interface.svelte) */
 :root {
 	--app-text-scale: 1;
+
+	/* Fixxit.ai Brand Colors */
+	--fixxit-primary: #0c3455;
+	--fixxit-primary-hover: #082944;
+	--fixxit-primary-dark: #051f32;
+	--fixxit-text: #151515;
+	--fixxit-text-secondary: #737373;
+	--fixxit-text-muted: #919191;
+	--fixxit-background: #ffffff;
+	--fixxit-background-gray: #f6f6f6;
+	--fixxit-border: #b9b9b9;
+	--fixxit-border-light: #eeeeee;
 }
 
 html {
@@ -446,7 +458,8 @@ input[type='number'] {
 	border-radius: 0.4rem;
 	box-decoration-break: clone;
 	padding: 0.1rem 0.3rem;
-	@apply text-sky-800 dark:text-sky-200 bg-sky-300/15 dark:bg-sky-500/15;
+	color: var(--fixxit-primary);
+	background-color: rgba(12, 52, 85, 0.15);
 }
 
 .mention::after {
@@ -457,7 +470,8 @@ input[type='number'] {
 	border-radius: 0.4rem;
 	box-decoration-break: clone;
 	padding: 0.1rem 0.3rem;
-	@apply text-sky-800 dark:text-sky-200 bg-sky-300/15 dark:bg-sky-500/15;
+	color: var(--fixxit-primary);
+	background-color: rgba(12, 52, 85, 0.15);
 }
 
 .tiptap .suggestion::after {

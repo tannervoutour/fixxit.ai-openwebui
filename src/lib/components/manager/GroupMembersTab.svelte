@@ -295,7 +295,7 @@
 				<button
 					on:click={handleSaveEdit}
 					disabled={saving}
-					class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition"
+					class="px-4 py-2 bg-fixxit-primary hover:bg-fixxit-primary-hover disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition"
 				>
 					{saving ? $i18n.t('Saving...') : $i18n.t('Save Changes')}
 				</button>

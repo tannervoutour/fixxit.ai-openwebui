@@ -88,7 +88,7 @@
 			bind:value={managementDashboardUrl}
 			type="url"
 			placeholder="https://cooperativekny.fixxit.ai"
-			class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+			class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-fixxit-primary focus:ring-fixxit-primary"
 		/>
 		<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 			{$i18n.t('Enter the full URL including https://')}

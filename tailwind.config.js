@@ -21,6 +21,24 @@ export default {
 					850: 'var(--color-gray-850, #262626)',
 					900: 'var(--color-gray-900, #171717)',
 					950: 'var(--color-gray-950, #0d0d0d)'
+				},
+				fixxit: {
+					// Primary brand colors from fixxit.ai
+					primary: '#0c3455',
+					'primary-hover': '#082944',
+					'primary-dark': '#051f32',
+					// Supporting colors
+					background: '#ffffff',
+					'background-gray': '#f6f6f6',
+					text: '#151515',
+					'text-secondary': '#737373',
+					'text-muted': '#919191',
+					// UI colors
+					border: '#b9b9b9',
+					'border-light': '#eeeeee',
+					// Additional grays from site
+					'gray-dark': '#5e5e5e',
+					'gray-medium': '#777777'
 				}
 			},
 			typography: {

@@ -135,7 +135,7 @@
 		</h2>
 		<button
 			on:click={() => (showCreateForm = !showCreateForm)}
-			class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+			class="px-4 py-2 bg-fixxit-primary hover:bg-fixxit-primary-hover text-white rounded-lg text-sm font-medium transition"
 		>
 			{showCreateForm ? $i18n.t('Cancel') : $i18n.t('Create Invitation')}
 		</button>
@@ -295,7 +295,7 @@
 						/>
 						<button
 							on:click={() => copyToClipboard(invitation.invitation_url)}
-							class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition"
+							class="px-3 py-2 bg-fixxit-primary hover:bg-fixxit-primary-hover text-white rounded text-sm font-medium transition"
 						>
 							{$i18n.t('Copy')}
 						</button>

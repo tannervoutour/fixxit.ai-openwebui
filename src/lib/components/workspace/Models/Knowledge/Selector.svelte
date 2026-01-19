@@ -197,7 +197,7 @@
 										</div>
 									{:else if item?.type === 'note'}
 										<div
-											class="bg-blue-500/20 text-blue-700 dark:text-blue-200 rounded-sm uppercase text-xs font-semibold px-1 shrink-0"
+											class="bg-fixxit-primary/20 text-fixxit-primary dark:text-white rounded-sm uppercase text-xs font-semibold px-1 shrink-0"
 										>
 											Note
 										</div>

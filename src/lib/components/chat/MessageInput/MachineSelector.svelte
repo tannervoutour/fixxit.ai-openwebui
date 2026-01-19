@@ -106,7 +106,7 @@
 					</label>
 					<select
 						bind:value={selectedGroupId}
-						class="w-full px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-fixxit-primary"
 					>
 						{#each userGroups as group}
 							<option value={group.id}>{group.name}</option>
@@ -128,7 +128,7 @@
 						</p>
 						<button
 							on:click={() => loadEquipment(selectedGroupId)}
-							class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+							class="text-sm text-fixxit-primary dark:text-fixxit-primary hover:underline"
 						>
 							{$i18n.t('Retry')}
 						</button>
