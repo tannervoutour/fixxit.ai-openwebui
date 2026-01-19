@@ -73,6 +73,7 @@
 	import IntegrationsMenu from './MessageInput/IntegrationsMenu.svelte';
 	import Component from '../icons/Component.svelte';
 	import PlusAlt from '../icons/PlusAlt.svelte';
+	import MachineSelector from './MessageInput/MachineSelector.svelte';
 
 	import { KokoroWorker } from '$lib/workers/KokoroWorker';
 
@@ -1083,6 +1084,38 @@
 							}}
 						/>
 					</div>
+
+					<!-- Machine Selector -->
+					<div class="mb-2">
+						<MachineSelector
+							onSelect={(machineName) => {
+								const currentPrompt = prompt.trim();
+								const machineText = `[Query Regarding: '${machineName}']`;
+
+								// Detect commands at start (/log, /help, etc.)
+								const commandMatch = currentPrompt.match(/^(\/\w+)/);
+
+								let newText;
+								if (commandMatch) {
+									// Command exists - insert AFTER command
+									const command = commandMatch[1];
+									const afterCommand = currentPrompt.slice(command.length).trim();
+									newText = afterCommand
+										? `${command} ${machineText} ${afterCommand}`
+										: `${command} ${machineText}`;
+								} else {
+									// No command - insert at beginning
+									newText = currentPrompt
+										? `${machineText} ${currentPrompt}`
+										: machineText;
+								}
+
+								// Update the editor with new text
+								setText(newText);
+							}}
+						/>
+					</div>
+
 					<form
 						class="w-full flex flex-col gap-1.5 {recording ? 'hidden' : ''}"
 						on:submit|preventDefault={() => {

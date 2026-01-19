@@ -124,10 +124,13 @@ export const getProblemCategories = async (token: string) => {
 	return res;
 };
 
-export const getEquipmentGroups = async (token: string, search?: string) => {
+export const getEquipmentGroups = async (token: string, groupId?: string, search?: string) => {
 	let error = null;
 
 	const searchParams = new URLSearchParams();
+	if (groupId) {
+		searchParams.append('group_id', groupId);
+	}
 	if (search) {
 		searchParams.append('search', search);
 	}

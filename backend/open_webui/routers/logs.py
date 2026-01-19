@@ -527,24 +527,52 @@ async def get_problem_categories(user=Depends(get_verified_user)):
 @router.get("/equipment-groups", response_model=List[EquipmentGroupResponse])
 async def get_equipment_groups(
     user=Depends(get_verified_user),
+    group_id: Optional[str] = Query(None, description="Filter by specific group"),
     search: Optional[str] = Query(None, description="Search equipment by name")
 ):
     """Get equipment groups from user's accessible group databases for dropdown"""
     try:
         # Get user's groups with database configuration
-        if user.role == "admin":
-            # Admins see all groups
-            user_groups = Groups.get_groups(filter={})
-        elif user.role == "manager":
-            # Managers see their managed groups
-            if user.managed_groups:
-                user_groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
-                user_groups = [g for g in user_groups if g is not None]
-            else:
-                user_groups = []
+        if group_id:
+            # Fetch from specific group only
+            group = Groups.get_group_by_id(group_id)
+            if not group:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Group not found"
+                )
+
+            # Verify user has access to this group
+            has_access = False
+            if user.role == "admin":
+                has_access = True
+            elif user.role == "manager" and user.managed_groups and group_id in user.managed_groups:
+                has_access = True
+            elif group.user_ids and user.id in group.user_ids:
+                has_access = True
+
+            if not has_access:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied to this group"
+                )
+
+            user_groups = [group]
         else:
-            # Regular users see groups they are members of
-            user_groups = Groups.get_groups(filter={"member_id": user.id})
+            # Original logic - fetch from all accessible groups
+            if user.role == "admin":
+                # Admins see all groups
+                user_groups = Groups.get_groups(filter={})
+            elif user.role == "manager":
+                # Managers see their managed groups
+                if user.managed_groups:
+                    user_groups = [Groups.get_group_by_id(gid) for gid in user.managed_groups]
+                    user_groups = [g for g in user_groups if g is not None]
+                else:
+                    user_groups = []
+            else:
+                # Regular users see groups they are members of
+                user_groups = Groups.get_groups(filter={"member_id": user.id})
 
         all_equipment = {}  # Use dict to avoid duplicates by conventional_name
         
