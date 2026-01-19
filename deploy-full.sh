@@ -7,14 +7,17 @@
 # This script handles the complete deployment workflow:
 #   1. Commits and pushes changes to GitHub
 #   2. Builds frontend locally
-#   3. Syncs server with GitHub (pulls backend changes)
-#   4. Deploys built frontend to server
-#   5. Restarts backend
+#   3. Ensures server environment is set up
+#   4. Syncs server with GitHub (pulls backend changes)
+#   5. Deploys built frontend to server
+#   6. Restarts backend
 #
 # Usage:
 #   ./deploy-full.sh [options]
 #
 # Options:
+#   --production     Deploy to production (app.fixxit.ai, port 8081)
+#   --dev            Deploy to development (dev.fixxit.ai, port 8080) [default]
 #   --skip-git       Skip git commit/push
 #   --skip-build     Skip frontend build (use existing)
 #   --skip-sync      Skip server git pull
@@ -22,6 +25,11 @@
 #   --message "msg"  Custom git commit message
 #   --dry-run        Show what would be done
 #   --help           Show this help
+#
+# Examples:
+#   ./deploy-full.sh --dev                    # Deploy to development
+#   ./deploy-full.sh --production             # Deploy to production
+#   ./deploy-full.sh --prod --skip-build      # Deploy to prod with existing build
 #
 # ==============================================================================
 
@@ -47,6 +55,7 @@ SKIP_SYNC=false
 NO_RESTART=false
 DRY_RUN=false
 COMMIT_MESSAGE=""
+ENVIRONMENT="dev"  # Default to development
 
 # ==============================================================================
 # Utility Functions
@@ -99,6 +108,14 @@ show_help() {
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --production|--prod)
+                ENVIRONMENT="prod"
+                shift
+                ;;
+            --development|--dev)
+                ENVIRONMENT="dev"
+                shift
+                ;;
             --skip-git)
                 SKIP_GIT=true
                 shift
@@ -153,6 +170,23 @@ load_config() {
         log_error "Invalid deployment configuration"
         exit 1
     fi
+
+    # Set environment-specific variables
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        DEPLOY_REMOTE_PATH="$PROD_REMOTE_PATH"
+        DEPLOY_BACKEND_PORT="$PROD_BACKEND_PORT"
+        DEPLOY_DOMAIN="$PROD_DOMAIN"
+        DEPLOY_START_SCRIPT="start_production.sh"
+    else
+        DEPLOY_REMOTE_PATH="$DEV_REMOTE_PATH"
+        DEPLOY_BACKEND_PORT="$DEV_BACKEND_PORT"
+        DEPLOY_DOMAIN="$DEV_DOMAIN"
+        DEPLOY_START_SCRIPT="start_server.sh"
+    fi
+
+    log "Environment: ${ENVIRONMENT^^}"
+    log "Domain: $DEPLOY_DOMAIN"
+    log "Remote path: $DEPLOY_REMOTE_PATH"
 }
 
 # ==============================================================================
@@ -273,11 +307,60 @@ build_frontend() {
 }
 
 # ==============================================================================
+# Ensure Server Environment is Set Up
+# ==============================================================================
+
+ensure_server_setup() {
+    log_step "3. Ensure Server Environment Setup"
+
+    if [ "$DRY_RUN" = true ]; then
+        log "DRY RUN: Would check/setup server environment"
+        return 0
+    fi
+
+    log "Checking if remote directory exists..."
+
+    local setup_command=$(cat <<'EOF'
+# Check if directory exists
+if [ ! -d "$REMOTE_PATH" ]; then
+    echo "Directory does not exist. Cloning repository..."
+    cd ~
+    git clone https://github.com/tannervoutour/fixxit.ai-openwebui.git $(basename "$REMOTE_PATH")
+    cd "$REMOTE_PATH"
+
+    # Create logs directory
+    mkdir -p logs
+
+    # Set up Python virtual environment
+    echo "Setting up Python virtual environment..."
+    cd backend
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+
+    echo "Server environment initialized successfully!"
+else
+    echo "Directory exists. Skipping initial setup."
+fi
+EOF
+)
+
+    if ssh -i "$DEPLOY_KEY" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+        "REMOTE_PATH='$DEPLOY_REMOTE_PATH'; bash -c '$setup_command'"; then
+        log_success "Server environment ready"
+    else
+        log_error "Failed to setup server environment"
+        exit 1
+    fi
+}
+
+# ==============================================================================
 # Sync Server with GitHub
 # ==============================================================================
 
 sync_server_with_github() {
-    log_step "3. Sync Server with GitHub"
+    log_step "4. Sync Server with GitHub"
 
     if [ "$SKIP_SYNC" = true ]; then
         log "Skipping server sync (--skip-sync)"
@@ -315,32 +398,38 @@ EOF
 # ==============================================================================
 
 deploy_frontend() {
-    log_step "4. Deploy Frontend to Server"
+    log_step "5. Deploy Frontend to Server"
 
     if [ "$DRY_RUN" = true ]; then
         log "DRY RUN: Would deploy frontend to server"
         return 0
     fi
 
-    log "Deploying frontend using rsync..."
+    log "Deploying frontend to $DEPLOY_DOMAIN..."
 
-    local deploy_script="$PROJECT_ROOT/deploy-to-lightsail.sh"
-
-    if [ ! -f "$deploy_script" ]; then
-        log_error "Deploy script not found: $deploy_script"
-        exit 1
-    fi
-
-    local deploy_flags="--skip-build"
-    if [ "$NO_RESTART" = false ]; then
-        deploy_flags="$deploy_flags --restart"
-    fi
-
-    if "$deploy_script" $deploy_flags; then
+    # Deploy built frontend via rsync
+    log "Syncing build directory to server..."
+    if rsync -avz --delete \
+        -e "ssh -i $DEPLOY_KEY -p $DEPLOY_PORT" \
+        "$PROJECT_ROOT/build/" \
+        "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_REMOTE_PATH/build/"; then
         log_success "Frontend deployed successfully"
     else
         log_error "Frontend deployment failed"
         exit 1
+    fi
+
+    # Restart the backend server if needed
+    if [ "$NO_RESTART" = false ]; then
+        log "Restarting backend server..."
+        local restart_command="cd $DEPLOY_REMOTE_PATH && ./$DEPLOY_START_SCRIPT restart"
+
+        if ssh -i "$DEPLOY_KEY" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "$restart_command"; then
+            log_success "Backend restarted successfully"
+        else
+            log_error "Failed to restart backend"
+            exit 1
+        fi
     fi
 }
 
@@ -361,8 +450,10 @@ print_summary() {
         echo ""
     fi
 
+    log "Environment: ${ENVIRONMENT^^}"
     log_success "Git changes pushed to GitHub"
     log_success "Frontend built locally"
+    log_success "Server environment ready"
     log_success "Server synced with GitHub"
     log_success "Frontend deployed to server"
 
@@ -372,12 +463,13 @@ print_summary() {
 
     echo ""
     echo -e "${CYAN}Access your application:${NC}"
-    echo -e "  ${YELLOW}http://$DEPLOY_HOST:8080${NC}"
+    echo -e "  ${YELLOW}https://$DEPLOY_DOMAIN${NC}"
+    echo -e "  ${YELLOW}http://$DEPLOY_HOST:$DEPLOY_BACKEND_PORT${NC} (direct)"
     echo ""
 
     echo -e "${CYAN}Quick checks:${NC}"
     echo -e "  ${YELLOW}ssh -i $DEPLOY_KEY $DEPLOY_USER@$DEPLOY_HOST${NC}"
-    echo -e "  ${YELLOW}cd $DEPLOY_REMOTE_PATH && ./start_server.sh status${NC}"
+    echo -e "  ${YELLOW}cd $DEPLOY_REMOTE_PATH && ./$DEPLOY_START_SCRIPT status${NC}"
     echo ""
 }
 
@@ -404,6 +496,7 @@ main() {
     # Execute deployment workflow
     git_commit_and_push
     build_frontend
+    ensure_server_setup
     sync_server_with_github
     deploy_frontend
 
