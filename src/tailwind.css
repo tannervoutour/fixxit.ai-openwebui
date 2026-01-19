@@ -2,6 +2,22 @@
 
 @config '../tailwind.config.js';
 
+@theme {
+	/* Fixxit Brand Colors */
+	--color-fixxit-primary: #0c3455;
+	--color-fixxit-primary-hover: #082944;
+	--color-fixxit-primary-dark: #051f32;
+	--color-fixxit-background: #ffffff;
+	--color-fixxit-background-gray: #f6f6f6;
+	--color-fixxit-text: #151515;
+	--color-fixxit-text-secondary: #737373;
+	--color-fixxit-text-muted: #919191;
+	--color-fixxit-border: #b9b9b9;
+	--color-fixxit-border-light: #eeeeee;
+	--color-fixxit-gray-dark: #5e5e5e;
+	--color-fixxit-gray-medium: #777777;
+}
+
 /*
   The default border color has changed to `currentColor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
