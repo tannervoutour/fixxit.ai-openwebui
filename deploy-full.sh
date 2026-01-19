@@ -255,6 +255,9 @@ build_frontend() {
     log "Building frontend (this may take 2-3 minutes)..."
     local start_time=$(date +%s)
 
+    # Increase Node.js memory limit for build
+    export NODE_OPTIONS="--max-old-space-size=8192"
+
     if npm run build > /tmp/build.log 2>&1; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
