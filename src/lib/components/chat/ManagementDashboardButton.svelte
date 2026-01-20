@@ -86,28 +86,42 @@
 		}
 	};
 
-	// Reload groups when user changes or managed_groups changes
-	// Watch the user object directly to ensure reactivity
-	$: {
-		// This will run whenever $user changes at all
-		if ($user) {
-			console.log('[Management Dashboard] User changed, checking...', {
-				role: $user.role,
-				managed_groups: $user.managed_groups,
-				has_managed_groups: !!$user.managed_groups
-			});
+	// Subscribe to user store changes and reload when managed_groups changes
+	let previousManagedGroupsJson = '';
 
-			// Only load if user is a manager with managed groups
-			if ($user.role === 'manager' && $user.managed_groups && $user.managed_groups.length > 0) {
-				console.log('[Management Dashboard] User is manager with groups, loading...');
-				loadGroups();
+	$: {
+		const currentManagedGroupsJson = $user?.managed_groups ? JSON.stringify($user.managed_groups) : '';
+
+		console.log('[Management Dashboard] Reactive check:', {
+			user_exists: !!$user,
+			role: $user?.role,
+			managed_groups: $user?.managed_groups,
+			current_json: currentManagedGroupsJson,
+			previous_json: previousManagedGroupsJson,
+			changed: currentManagedGroupsJson !== previousManagedGroupsJson
+		});
+
+		if (currentManagedGroupsJson && currentManagedGroupsJson !== previousManagedGroupsJson) {
+			console.log('[Management Dashboard] managed_groups changed, reloading...');
+			previousManagedGroupsJson = currentManagedGroupsJson;
+
+			if ($user?.role === 'manager') {
+				console.log('[Management Dashboard] Triggering loadGroups from reactive statement');
+				// Use setTimeout to ensure this runs after current tick
+				setTimeout(() => loadGroups(), 0);
 			}
 		}
 	}
 
 	onMount(() => {
 		console.log('[Management Dashboard] Component mounted, initial user:', $user);
-		loadGroups();
+
+		// Always try to load on mount if user is a manager
+		if ($user?.role === 'manager' && $user?.managed_groups?.length > 0) {
+			console.log('[Management Dashboard] User is manager on mount, loading groups...');
+			loadGroups();
+		}
+
 		document.addEventListener('click', handleClickOutside);
 		return () => {
 			document.removeEventListener('click', handleClickOutside);
