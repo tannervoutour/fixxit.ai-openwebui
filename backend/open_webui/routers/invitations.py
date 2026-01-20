@@ -14,7 +14,7 @@ import time
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from open_webui.models.invitations import Invitations, InvitationModel
@@ -28,6 +28,22 @@ router = APIRouter()
 
 # Get frontend URL from environment variable, default to production
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://app.fixxit.ai")
+
+
+def get_base_url_from_request(request: Request) -> str:
+    """
+    Extract the base URL from the incoming request.
+    Uses the request's scheme and host to dynamically build the URL.
+    Falls back to FRONTEND_BASE_URL if request is not available.
+    """
+    if not request:
+        return FRONTEND_BASE_URL
+
+    # Get scheme (http/https) and host from request
+    scheme = request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+
+    return f"{scheme}://{host}"
 
 
 ############################
@@ -118,6 +134,7 @@ def format_invitation_response(
 @router.post("/create", response_model=InvitationResponse)
 async def create_invitation(
     request: CreateInvitationRequest,
+    http_request: Request,
     user=Depends(get_admin_or_manager_user)
 ):
     """
@@ -167,12 +184,15 @@ async def create_invitation(
 
     logger.info(f"Invitation created by {user.id} for group {request.group_id}")
 
-    return format_invitation_response(invitation)
+    # Get base URL from request and pass to formatter
+    base_url = get_base_url_from_request(http_request)
+    return format_invitation_response(invitation, base_url)
 
 
 @router.get("/group/{group_id}", response_model=list[InvitationResponse])
 async def get_group_invitations(
     group_id: str,
+    http_request: Request,
     user=Depends(get_admin_or_manager_user)
 ):
     """
@@ -189,11 +209,14 @@ async def get_group_invitations(
 
     invitations = Invitations.get_invitations_by_group_id(group_id)
 
-    return [format_invitation_response(inv) for inv in invitations]
+    # Get base URL from request and pass to formatter
+    base_url = get_base_url_from_request(http_request)
+    return [format_invitation_response(inv, base_url) for inv in invitations]
 
 
 @router.get("/list", response_model=list[InvitationResponse])
 async def list_my_invitations(
+    http_request: Request,
     user=Depends(get_admin_or_manager_user)
 ):
     """
@@ -219,7 +242,9 @@ async def list_my_invitations(
             group_invitations = Invitations.get_invitations_by_group_id(group_id)
             invitations.extend(group_invitations)
 
-    return [format_invitation_response(inv) for inv in invitations]
+    # Get base URL from request and pass to formatter
+    base_url = get_base_url_from_request(http_request)
+    return [format_invitation_response(inv, base_url) for inv in invitations]
 
 
 @router.post("/{invitation_id}/revoke")
