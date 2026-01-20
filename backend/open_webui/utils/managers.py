@@ -54,7 +54,7 @@ def get_managed_groups(user: UserModel) -> list[str]:
     """
     if is_admin(user):
         # Return all group IDs
-        all_groups = Groups.get_groups()
+        all_groups = Groups.get_groups({})
         return [group.id for group in all_groups]
 
     if is_manager(user) and user.managed_groups:

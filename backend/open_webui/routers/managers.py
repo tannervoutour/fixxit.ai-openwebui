@@ -489,7 +489,7 @@ async def get_my_managed_groups(
 
     if is_admin(manager):
         # Admin gets all groups
-        groups = Groups.get_groups()
+        groups = Groups.get_groups({})
     else:
         # Manager gets only their assigned groups
         groups = [Groups.get_group_by_id(gid) for gid in managed_group_ids]

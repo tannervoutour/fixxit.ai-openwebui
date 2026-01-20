@@ -207,7 +207,7 @@ async def list_my_invitations(
     if user.role == "admin":
         # Admin can see all invitations - get invitations for all groups
         all_invitations = []
-        all_groups = Groups.get_groups()
+        all_groups = Groups.get_groups({})
         for group in all_groups:
             group_invitations = Invitations.get_invitations_by_group_id(group.id)
             all_invitations.extend(group_invitations)
