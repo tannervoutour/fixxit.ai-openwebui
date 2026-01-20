@@ -323,3 +323,5 @@ data/
 # Docker
 docker-compose.override.yml
 docker-archive/
+*.pem
+*.pem:Zone.Identifier
