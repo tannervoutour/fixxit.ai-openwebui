@@ -548,8 +548,11 @@ async def get_equipment_groups(
                 has_access = True
             elif user.role == "manager" and user.managed_groups and group_id in user.managed_groups:
                 has_access = True
-            elif group.user_ids and user.id in group.user_ids:
-                has_access = True
+            else:
+                # Check if user is a member of the group
+                group_user_ids = Groups.get_group_user_ids_by_id(group_id)
+                if group_user_ids and user.id in group_user_ids:
+                    has_access = True
 
             if not has_access:
                 raise HTTPException(
