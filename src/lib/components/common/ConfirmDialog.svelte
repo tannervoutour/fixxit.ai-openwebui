@@ -64,13 +64,28 @@
 	$: if (mounted) {
 		if (show && modalElement) {
 			document.body.appendChild(modalElement);
-			focusTrap = FocusTrap.createFocusTrap(modalElement);
-			focusTrap.activate();
+			try {
+				focusTrap = FocusTrap.createFocusTrap(modalElement, {
+					// Prevent errors when encountering cross-origin iframes
+					preventScroll: true,
+					escapeDeactivates: true
+				});
+				focusTrap.activate();
+			} catch (error) {
+				// If focus trap fails (e.g., cross-origin iframe issues), continue without it
+				console.warn('Failed to create focus trap in ConfirmDialog:', error);
+			}
 
 			window.addEventListener('keydown', handleKeyDown);
 			document.body.style.overflow = 'hidden';
 		} else if (modalElement) {
-			focusTrap.deactivate();
+			if (focusTrap) {
+				try {
+					focusTrap.deactivate();
+				} catch (error) {
+					console.warn('Failed to deactivate focus trap in ConfirmDialog:', error);
+				}
+			}
 
 			window.removeEventListener('keydown', handleKeyDown);
 			document.body.removeChild(modalElement);

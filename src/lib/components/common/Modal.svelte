@@ -57,19 +57,40 @@
 
 	$: if (show && modalElement) {
 		document.body.appendChild(modalElement);
-		focusTrap = FocusTrap.createFocusTrap(modalElement, {
-			allowOutsideClick: (e) => {
-				return (
-					e.target.closest('[data-sonner-toast]') !== null ||
-					e.target.closest('.modal-content') === null
-				);
-			}
-		});
-		focusTrap.activate();
+		try {
+			focusTrap = FocusTrap.createFocusTrap(modalElement, {
+				allowOutsideClick: (e) => {
+					try {
+						return (
+							e.target.closest('[data-sonner-toast]') !== null ||
+							e.target.closest('.modal-content') === null
+						);
+					} catch (error) {
+						// Cross-origin iframe access error - ignore and allow outside click
+						console.warn('Focus trap allowOutsideClick error (cross-origin):', error);
+						return true;
+					}
+				},
+				// Prevent errors when encountering cross-origin iframes
+				preventScroll: true,
+				escapeDeactivates: true,
+				clickOutsideDeactivates: false
+			});
+			focusTrap.activate();
+		} catch (error) {
+			// If focus trap fails (e.g., cross-origin iframe issues), continue without it
+			console.warn('Failed to create focus trap:', error);
+		}
 		window.addEventListener('keydown', handleKeyDown);
 		document.body.style.overflow = 'hidden';
 	} else if (modalElement) {
-		focusTrap.deactivate();
+		if (focusTrap) {
+			try {
+				focusTrap.deactivate();
+			} catch (error) {
+				console.warn('Failed to deactivate focus trap:', error);
+			}
+		}
 		window.removeEventListener('keydown', handleKeyDown);
 		document.body.removeChild(modalElement);
 		document.body.style.overflow = 'unset';
