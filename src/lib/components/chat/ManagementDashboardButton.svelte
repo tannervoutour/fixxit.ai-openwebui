@@ -87,7 +87,10 @@
 	};
 
 	// Reload groups when user changes or managed_groups changes
-	$: if ($user) {
+	// Convert to string to ensure reactivity triggers on array changes
+	$: managedGroupsKey = $user?.managed_groups ? JSON.stringify($user.managed_groups) : '';
+	$: if (managedGroupsKey && $user?.role === 'manager') {
+		console.log('[Management Dashboard] User or managed_groups changed, reloading...');
 		loadGroups();
 	}
 
