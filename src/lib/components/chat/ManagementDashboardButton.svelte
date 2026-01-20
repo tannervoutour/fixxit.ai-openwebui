@@ -87,14 +87,26 @@
 	};
 
 	// Reload groups when user changes or managed_groups changes
-	// Convert to string to ensure reactivity triggers on array changes
-	$: managedGroupsKey = $user?.managed_groups ? JSON.stringify($user.managed_groups) : '';
-	$: if (managedGroupsKey && $user?.role === 'manager') {
-		console.log('[Management Dashboard] User or managed_groups changed, reloading...');
-		loadGroups();
+	// Watch the user object directly to ensure reactivity
+	$: {
+		// This will run whenever $user changes at all
+		if ($user) {
+			console.log('[Management Dashboard] User changed, checking...', {
+				role: $user.role,
+				managed_groups: $user.managed_groups,
+				has_managed_groups: !!$user.managed_groups
+			});
+
+			// Only load if user is a manager with managed groups
+			if ($user.role === 'manager' && $user.managed_groups && $user.managed_groups.length > 0) {
+				console.log('[Management Dashboard] User is manager with groups, loading...');
+				loadGroups();
+			}
+		}
 	}
 
 	onMount(() => {
+		console.log('[Management Dashboard] Component mounted, initial user:', $user);
 		loadGroups();
 		document.addEventListener('click', handleClickOutside);
 		return () => {
