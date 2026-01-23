@@ -37,7 +37,31 @@ router = APIRouter()
 async def get_groups(share: Optional[bool] = None, user=Depends(get_verified_user)):
 
     filter = {}
-    if user.role != "admin":
+
+    # Role-based filtering
+    if user.role == "admin":
+        # Admins see all groups - no filter
+        pass
+    elif user.role == "manager":
+        # Managers see only their managed groups
+        if user.managed_groups:
+            # Get groups by IDs (post-filter since get_groups doesn't support ids filter)
+            all_groups = Groups.get_groups(filter={})
+            groups = [g for g in all_groups if g.id in user.managed_groups]
+
+            # Apply share filter if specified
+            if share is not None:
+                # Filter is already applied in the Groups model method
+                filter["share"] = share
+                groups = Groups.get_groups(filter=filter)
+                groups = [g for g in groups if g.id in user.managed_groups]
+
+            return groups
+        else:
+            # Manager with no managed groups sees nothing
+            return []
+    else:
+        # Regular users see only groups they're members of
         filter["member_id"] = user.id
 
     if share is not None:
